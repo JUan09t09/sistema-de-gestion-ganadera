@@ -11,37 +11,31 @@ const PERFILES = {
   lechero: {
     nombre: '🥛 Vacas lecheras',
     desc:   'Solo vacas de leche — producción, reproducción y salud',
-    modulos: ['dashboard','animales','leche','reproduccion','salud','alimentacion','finanzas','inventario'],
+    modulos: ['dashboard','animales','leche','reproduccion','salud','alimentacion','potreros','finanzas','inventario'],
     tipos:   ['bovino']
   },
   carne: {
     nombre: '🥩 Ganado de carne',
     desc:   'Bovinos para engorde — control de peso, compra/venta y rentabilidad',
-    modulos: ['dashboard','animales','carne','salud','alimentacion','finanzas','inventario'],
+    modulos: ['dashboard','animales','carne','salud','alimentacion','potreros','finanzas','inventario'],
     tipos:   ['bovino']
   },
   equino: {
     nombre: '🐎 Solo caballos',
     desc:   'Equinos — salud, reproducción y manejo sin módulos de leche',
-    modulos: ['dashboard','animales','reproduccion','salud','alimentacion','finanzas','inventario'],
+    modulos: ['dashboard','animales','reproduccion','salud','alimentacion','potreros','finanzas','inventario'],
     tipos:   ['equino']
-  },
-  terneros: {
-    nombre: '🐮 Terneros / Levante',
-    desc:   'Cría y levante — seguimiento de peso sin módulo de leche',
-    modulos: ['dashboard','animales','carne','salud','alimentacion','finanzas','inventario'],
-    tipos:   ['bovino']
   },
   mixto: {
     nombre: '🐄🐎 Mixto (vacas + caballos)',
     desc:   'Bovinos y equinos — leche, carne y reproducción',
-    modulos: ['dashboard','animales','leche','carne','reproduccion','salud','alimentacion','finanzas','inventario'],
+    modulos: ['dashboard','animales','leche','carne','reproduccion','salud','alimentacion','potreros','finanzas','inventario'],
     tipos:   ['bovino','equino']
   },
   completo: {
     nombre: '🌿 Finca completa',
     desc:   'Todos los módulos disponibles',
-    modulos: ['dashboard','animales','leche','carne','reproduccion','salud','alimentacion','finanzas','inventario'],
+    modulos: ['dashboard','animales','leche','carne','reproduccion','salud','alimentacion','potreros','finanzas','inventario'],
     tipos:   ['bovino','equino']
   }
 };
@@ -54,6 +48,7 @@ const TITULOS_MOD = {
   reproduccion: '🔁 Reproducción',
   salud:        '💉 Salud y vacunas',
   alimentacion: '🌾 Alimentación',
+  potreros:     '🌿 Potreros y pesebreras',
   finanzas:     '💰 Control financiero',
   inventario:   '📦 Inventario general',
 };
@@ -66,6 +61,7 @@ const NAV_ITEMS = {
   reproduccion: { icon: '🔁', label: 'Reproducción' },
   salud:        { icon: '💉', label: 'Salud y vacunas', id: 'nav-salud' },
   alimentacion: { icon: '🌾', label: 'Alimentación' },
+  potreros:     { icon: '🌿', label: 'Potreros y pesebreras' },
   finanzas:     { icon: '💰', label: 'Finanzas' },
   inventario:   { icon: '📦', label: 'Inventario' },
 };
@@ -232,7 +228,7 @@ function construirSelectorPerfil() {
   cont.innerHTML = Object.entries(PERFILES).map(function(entry) {
     const key = entry[0], p = entry[1];
     return '<label class="perfil-opcion" onclick="seleccionarPerfil(\'' + key + '\')" id="perfil-lbl-' + key + '">' +
-      '<input type="radio" name="perfil" value="' + key + '"' + (key === 'completo' ? ' checked' : '') + '> ' +
+      '<input type="radio" name="perfil" value="' + key + '"' + (key === 'lechero' ? ' checked' : '') + '> ' +
       '<span class="perfil-nombre">' + p.nombre + '</span>' +
       '<span class="perfil-desc">' + p.desc + '</span>' +
       '</label>';
@@ -251,7 +247,7 @@ function seleccionarPerfil(key) {
 
 function getPerfilSeleccionado() {
   const radio = document.querySelector('input[name="perfil"]:checked');
-  return radio ? radio.value : 'completo';
+  return radio ? radio.value : 'lechero';
 }
 
 // ============================================================
@@ -358,7 +354,7 @@ function accionLogin() {
       .then(function(cred) {
         return firestore.collection('usuarios').doc(cred.user.uid).set({
           config: { nombre: finca, propietario: nombre, lugar: '', perfil: perfil },
-          animales:[], leche:[], reproductivo:[], salud:[], alimentacion:[], finanzas:[], pesajes:[],
+          animales:[], leche:[], reproductivo:[], salud:[], alimentacion:[], finanzas:[], pesajes:[], potreros:[],
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
       })
@@ -476,6 +472,7 @@ function mostrarPagina(nombre) {
     reproduccion: renderReproduccion,
     salud:        renderSalud,
     alimentacion: renderAlimentacion,
+    potreros:     renderPotreros,
     finanzas:     renderFinanzas,
     inventario:   renderInventario,
   };
@@ -2269,7 +2266,7 @@ const MANUAL_SECCIONES = [
     contenido: [
       { subtitulo: '¿Cómo empezar?', texto: 'Al abrir la app por primera vez, debes conectar Firebase (base de datos gratuita en la nube). Sigue los 5 pasos de la pantalla de configuración inicial. Solo se hace una vez.' },
       { subtitulo: 'Crear tu cuenta', texto: 'En la pantalla de inicio de sesión, ve a la pestaña "Crear cuenta". Ingresa tu correo, contraseña y nombre de tu finca. Elige el tipo de finca que mejor te describe — esto define qué módulos verás.' },
-      { subtitulo: 'Tipos de finca disponibles', texto: '🥛 Vacas lecheras: producción de leche y reproducción.\n🥩 Ganado de carne: control de peso y rentabilidad.\n🐎 Solo caballos: manejo equino sin módulo de leche.\n🐮 Terneros: cría y levante.\n🐄🐎 Mixto: bovinos y equinos.\n🌿 Completo: todos los módulos.' },
+      { subtitulo: 'Tipos de finca disponibles', texto: '� Ganado de carne: control de peso y rentabilidad.\n🐎 Solo caballos: manejo equino sin módulo de leche.\n🐄🐎 Mixto: bovinos y equinos con leche y carne.\n🌿 Completo: todos los módulos disponibles.' },
       { subtitulo: 'Cambiar tipo de finca', texto: 'Puedes cambiar el perfil en cualquier momento desde el botón "Configurar finca" en el panel principal. Los datos ya guardados no se pierden.' },
     ]
   },
