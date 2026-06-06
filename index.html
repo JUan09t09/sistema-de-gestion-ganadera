@@ -1,951 +1,588 @@
-  <!DOCTYPE html>
-  <html lang="es">
-  <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mi Finca — Gestión Ganadera</title>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="icon" href="logo.png" type="image/png">
-  </head>
-  <body>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi Finca — Gestión Ganadera</title>
 
-  <!-- ===== PANTALLA: CONFIGURAR FIREBASE ===== -->
-  <div id="pantalla-configurar" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:1rem;background:linear-gradient(135deg,#1b4332 0%,#2d6a4f 50%,#52b788 100%);">
-    <div class="config-card">
-      <h2>⚙️ Configuración inicial</h2>
-      <p>Conecta Firebase para sincronizar entre dispositivos (gratuito).</p>
-      <div class="config-step"><span class="step-num">1</span> Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> e inicia sesión.</div>
-      <div class="config-step"><span class="step-num">2</span> Crea un proyecto → nombre (ej: <strong>mi-finca</strong>) → desactiva Analytics → Crear.</div>
-      <div class="config-step"><span class="step-num">3</span> Ícono <strong>&lt;/&gt;</strong> (Web) → registra la app → copia <code>firebaseConfig</code>.</div>
-      <div class="config-step"><span class="step-num">4</span> <strong>Authentication → Email/Contraseña → Habilitar</strong>.</div>
-      <div class="config-step"><span class="step-num">5</span> <strong>Firestore → Crear base de datos → Modo prueba → Listo</strong>.</div>
-      <div class="config-fields">
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- Estilos -->
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="logo.png" type="image/png">
+
+</head>
+<body>
+
+<!-- ===== PANTALLA: CONFIGURAR FIREBASE ===== -->
+<div id="pantalla-configurar" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:1rem; background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #52b788 100%);">
+  <div class="config-card">
+    <h2>⚙️ Configuración inicial</h2>
+    <p>Para sincronizar tu finca entre dispositivos, necesitas conectar Firebase (gratuito).</p>
+
+    <div class="config-step">
+      <span class="step-num">1</span>
+      Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> e inicia sesión con tu cuenta Google.
+    </div>
+    <div class="config-step">
+      <span class="step-num">2</span>
+      Crea un proyecto nuevo → pon cualquier nombre (ej: <strong>mi-finca</strong>) → desactiva Google Analytics → <strong>Crear proyecto</strong>.
+    </div>
+    <div class="config-step">
+      <span class="step-num">3</span>
+      En el proyecto, haz clic en el ícono <strong>&lt;/&gt;</strong> (Web) → registra la app → copia la configuración <code>firebaseConfig</code>.
+    </div>
+    <div class="config-step">
+      <span class="step-num">4</span>
+      En el menú izquierdo: <strong>Authentication → Comenzar → Email/Contraseña → Habilitar</strong>.
+    </div>
+    <div class="config-step">
+      <span class="step-num">5</span>
+      En el menú izquierdo: <strong>Firestore Database → Crear base de datos → Modo de prueba → Listo</strong>.
+    </div>
+
+    <div class="config-fields">
+      <div>
+        <label>Pega aquí el objeto firebaseConfig completo</label>
+        <textarea id="cfg-paste" placeholder='const firebaseConfig = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};'></textarea>
+      </div>
+      <div id="cfg-error" style="color:var(--rojo);font-size:0.8rem;display:none"></div>
+      <button class="btn-login" onclick="guardarConfigFirebase()">✅ Conectar y comenzar</button>
+    </div>
+
+    <div style="margin-top:1rem;padding:12px;background:var(--verde-pastel);border-radius:8px;font-size:0.78rem;color:var(--verde-oscuro)">
+      <strong>🔒 Privacidad:</strong> Tu configuración se guarda solo en este navegador. Firebase es gratuito para uso personal (hasta 1GB de datos, más que suficiente para una finca).
+    </div>
+  </div>
+</div>
+
+<!-- ===== PANTALLA: LOGIN ===== -->
+<div id="pantalla-login" style="display:none">
+  <div class="login-card">
+    <div class="login-logo">
+      <div style="font-size:2.5rem">🌿</div>
+      <h1>Mi Finca</h1>
+      <p>Gestión ganadera · Acceso seguro</p>
+    </div>
+
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="cambiarTab('login')" id="tab-login">Iniciar sesión</button>
+      <button class="login-tab" onclick="cambiarTab('registro')" id="tab-registro">Crear cuenta</button>
+    </div>
+
+    <div id="login-error" class="login-error"></div>
+    <div id="login-success" class="login-success"></div>
+
+    <div class="login-form">
+      <div>
+        <label>Correo electrónico</label>
+        <input type="email" id="login-email" placeholder="tu@correo.com" autocomplete="email">
+      </div>
+      <div>
+        <label>Contraseña</label>
+        <input type="password" id="login-password" placeholder="Tu contraseña" autocomplete="current-password">
+      </div>
+      <div id="campo-nombre" style="display:none">
+        <label>Tu nombre</label>
+        <input type="text" id="login-nombre" placeholder="Ej: Juan Pérez">
+      </div>
+      <div id="campo-finca" style="display:none">
+        <label>Nombre de tu finca</label>
+        <input type="text" id="login-finca" placeholder="Ej: Finca La Esperanza">
+      </div>
+      <button class="btn-login" id="btn-accion-login" onclick="accionLogin()">Iniciar sesión</button>
+      <div style="text-align:center">
+        <button onclick="olvidoContrasena()" style="background:none;border:none;color:var(--azul);font-size:0.8rem;cursor:pointer;font-family:Nunito">
+          ¿Olvidaste tu contraseña?
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:1.5rem">
+      <button onclick="cambiarFirebase()" style="background:none;border:none;color:var(--gris-texto);font-size:0.75rem;cursor:pointer;font-family:Nunito">
+        ⚙️ Cambiar configuración Firebase
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PANTALLA: CARGANDO ===== -->
+<div id="pantalla-cargando">
+  <div class="spinner"></div>
+  <p style="color:var(--gris-texto);font-size:0.85rem" id="texto-cargando">Conectando...</p>
+</div>
+
+<!-- ===== APP PRINCIPAL ===== -->
+<div id="app-principal">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <h1 id="sidebar-titulo-finca">🌿 Mi Finca</h1>
+      <p>Sistema de gestión ganadera</p>
+    </div>
+    <nav>
+      <div class="nav-item active" onclick="mostrarPagina('dashboard')">
+        <span class="icon">🏠</span> Panel principal
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('animales')">
+        <span class="icon">🐴</span> Mis animales
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('leche')">
+        <span class="icon">🥛</span> Producción leche
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('reproduccion')">
+        <span class="icon">🧬</span> Reproducción
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('salud')" id="nav-salud">
+        <span class="icon">💉</span> Salud y vacunas
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('alimentacion')">
+        <span class="icon">🌾</span> Alimentación
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('finanzas')">
+        <span class="icon">💰</span> Finanzas
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('inventario')">
+        <span class="icon">📦</span> Inventario
+      </div>
+    </nav>
+    <div class="sync-indicator">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-texto">Sincronizado</span>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-avatar" id="avatar-inicial" onclick="cerrarSesion()" title="Cerrar sesión">A</div>
+      <div>
+        <p id="nombre-usuario">Usuario</p>
+        <span id="email-usuario" style="font-size:0.65rem;color:rgba(255,255,255,0.35)">correo</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div id="main">
+    <div class="topbar">
+      <button class="menu-toggle" id="menu-toggle" type="button">☰</button>
+      <span class="topbar-title" id="topbar-titulo">🏠 Panel principal</span>
+      <div class="topbar-actions">
+        <button class="topbar-alerta" id="btn-alerta" onclick="mostrarPagina('salud')" style="display:none">
+          ⚠️ <span id="alerta-count">0</span> alertas
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="exportarCSV()">📥 CSV</button>
+        <button class="btn btn-verde btn-sm" onclick="document.getElementById('input-importar').click()">📤 Importar</button>
+        <input type="file" id="input-importar" accept=".csv" style="display:none" onchange="importarCSV(this)">
+        <button onclick="cerrarSesion()" title="Cerrar sesión" style="background:none;border:1px solid var(--gris-borde);border-radius:8px;padding:5px 8px;cursor:pointer;font-size:0.8rem;color:var(--gris-texto)">🔒 Salir</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="section-title">
         <div>
-          <label>Pega aquí el objeto firebaseConfig</label>
-          <textarea id="cfg-paste" placeholder='const firebaseConfig = {
-    apiKey: "...",
-    authDomain: "...",
-    projectId: "...",
-    storageBucket: "...",
-    messagingSenderId: "...",
-    appId: "..."
-  };'></textarea>
+          <h2>Informacion</h2>
+          <p id="fecha-hoy"></p>
         </div>
-        <div id="cfg-error" style="color:var(--rojo);font-size:0.8rem;display:none"></div>
-        <button class="btn-login" onclick="guardarConfigFirebase()">✅ Conectar y comenzar</button>
+        <button class="btn btn-verde" onclick="abrirModal('modal-config')">⚙️ Configurar finca</button>
       </div>
-      <div style="margin-top:1rem;padding:12px;background:var(--verde-pastel);border-radius:8px;font-size:0.78rem;color:var(--verde-oscuro)">
-        <strong>🔒 Privacidad:</strong> Tu configuración se guarda solo en este navegador.
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== PANTALLA: LOGIN ===== -->
-  <div id="pantalla-login" style="display:none">
-    <div class="login-card">
-
-      <div class="login-logo">
-        <div style="font-size:2.5rem">🌿</div>
-        <h1>Mi Finca</h1>
-        <p>Gestión ganadera · Acceso seguro</p>
-      </div>
-
-      <!-- SELECTOR MODO: Dueño o Trabajador -->
-      <div class="login-modo-tabs">
-        <button class="login-modo-tab active" id="tab-dueno" onclick="cambiarModoLogin('dueno')">
-          👑 Soy el dueño
-        </button>
-        <button class="login-modo-tab" id="tab-trabajador" onclick="cambiarModoLogin('trabajador')">
-          🧑‍🌾 Soy trabajador
-        </button>
-      </div>
-
-      <!-- ===== SECCIÓN DUEÑO ===== -->
-      <div id="seccion-dueno">
-        <div class="login-tabs" style="margin-top:12px">
-          <button class="login-tab active" onclick="cambiarTab('login')" id="tab-login">Iniciar sesión</button>
-          <button class="login-tab" onclick="cambiarTab('registro')" id="tab-registro">Crear cuenta</button>
-        </div>
-        <div id="login-error" class="login-error"></div>
-        <div id="login-success" class="login-success"></div>
-        <div class="login-form">
-          <div>
-            <label>Correo electrónico</label>
-            <input type="email" id="login-email" placeholder="tu@correo.com" autocomplete="email">
-          </div>
-          <div>
-            <label>Contraseña</label>
-            <input type="password" id="login-password" placeholder="Tu contraseña" autocomplete="current-password">
-          </div>
-          <div id="campo-nombre" style="display:none">
-            <label>Tu nombre</label>
-            <input type="text" id="login-nombre" placeholder="Ej: Juan Pérez">
-          </div>
-          <div id="campo-finca" style="display:none">
-            <label>Nombre de tu finca</label>
-            <input type="text" id="login-finca" placeholder="Ej: Finca La Esperanza">
-          </div>
-          <div id="campo-perfil" style="display:none">
-            <label style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--gris-texto);margin-bottom:8px;display:block">
-              ¿Qué tipo de finca tienes?
-            </label>
-            <div id="selector-perfil" class="perfil-grid"></div>
-          </div>
-          <button class="btn-login" id="btn-accion-login" onclick="accionLogin()">Iniciar sesión</button>
-          <div style="text-align:center">
-            <button onclick="olvidoContrasena()" style="background:none;border:none;color:var(--azul);font-size:0.8rem;cursor:pointer;font-family:Nunito">
-              ¿Olvidaste tu contraseña?
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== SECCIÓN TRABAJADOR ===== -->
-      <div id="seccion-trabajador" style="display:none">
-        <div style="background:var(--azul-pastel);border:1px solid rgba(26,111,168,0.2);border-radius:10px;padding:12px 14px;margin:14px 0;font-size:0.78rem;color:var(--azul)">
-          <strong>🧑‍🌾 Acceso de trabajador</strong><br>
-          Pide a tu empleador el <strong>Código de finca</strong> para poder ingresar.
-        </div>
-        <div id="login-error-trab" class="login-error"></div>
-        <div class="login-form">
-          <div>
-            <label>Código de finca</label>
-            <input type="text" id="trab-codigo-finca" placeholder="Código que te dio el dueño"
-              style="font-family:monospace;letter-spacing:0.5px">
-          </div>
-          <div>
-            <label>Tu correo de usuario</label>
-            <input type="email" id="trab-correo" placeholder="correo que te asignaron">
-          </div>
-          <div>
-            <label>Contraseña</label>
-            <input type="password" id="trab-password" placeholder="Tu contraseña">
-          </div>
-          <button class="btn-login" id="btn-login-trab" onclick="loginTrabajador()"
-            style="background:var(--azul)">
-            🧑‍🌾 Entrar como trabajador
-          </button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ===== PANTALLA: CARGANDO ===== -->
-  <div id="pantalla-cargando">
-    <div class="spinner"></div>
-    <p style="color:var(--gris-texto);font-size:0.85rem" id="texto-cargando">Conectando...</p>
-  </div>
-
-  <!-- ===== APP PRINCIPAL ===== -->
-  <div id="app-principal">
-
-    <!-- SIDEBAR -->
-    <div id="sidebar">
-      <div class="sidebar-logo">
-        <h1 id="sidebar-titulo-finca">🌿 Mi Finca</h1>
-        <p>Sistema de gestión ganadera</p>
-      </div>
-      <!-- Nav dinámica generada por JS según perfil -->
-      <nav id="nav-dinamico"></nav>
-      <div class="sync-indicator">
-        <div class="sync-dot" id="sync-dot"></div>
-        <span id="sync-texto">Sincronizado</span>
-      </div>
-      <div class="sidebar-user">
-        <div class="user-avatar" id="avatar-inicial" onclick="cerrarSesion()" title="Cerrar sesión">A</div>
-        <div style="min-width:0">
-          <p id="nombre-usuario">Usuario</p>
-          <span id="email-usuario" style="font-size:0.65rem;color:rgba(255,255,255,0.35)">correo</span>
-          <span id="chip-rol-usuario" style="display:none;font-size:0.62rem;color:#fff;background:#2d6a4f;border-radius:20px;padding:1px 7px;margin-top:3px;font-weight:700"></span>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-    <div id="main">
-      <!-- TOPBAR -->
-      <div class="topbar">
-        <button class="menu-toggle" id="menu-toggle" type="button">☰</button>
-        <span class="topbar-title" id="topbar-titulo">🏠 Panel principal</span>
-        <div class="topbar-actions">
-          <button class="topbar-alerta" id="btn-alerta" onclick="mostrarPagina('salud')" style="display:none">
-            ⚠️ <span id="alerta-count">0</span> alertas
-          </button>
-          <button onclick="abrirBusquedaGlobal()" title="Búsqueda global (Ctrl+K)" style="background:none;border:1px solid var(--gris-borde);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:0.9rem" id="btn-busqueda">🔍</button>
-          <button onclick="abrirComparador()" title="Comparar animales" style="background:none;border:1px solid var(--gris-borde);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:0.9rem">⚖️</button>
-          <button class="btn btn-outline btn-sm" onclick="exportarCSV()">📥 CSV</button>
-          <button class="btn btn-verde btn-sm" onclick="document.getElementById('input-importar').click()">📤 Importar</button>
-          <input type="file" id="input-importar" accept=".csv" style="display:none" onchange="importarCSV(this)">
-          <button onclick="cerrarSesion()" style="background:none;border:1px solid var(--gris-borde);border-radius:8px;padding:5px 8px;cursor:pointer;font-size:0.8rem;color:var(--gris-texto)">🔒 Salir</button>
-        </div>
-      </div>
-
-      <!-- ============ DASHBOARD ============ -->
-      <div class="page active" id="page-dashboard">
-        <div class="section-title">
-          <div><h2>Panel principal</h2><p id="fecha-hoy"></p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-config')">⚙️ Configurar finca</button>
-        </div>
-        <div class="stats-grid" id="stats-dashboard"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div class="card">
-            <div class="card-header"><h3>🚨 Alertas activas</h3></div>
-            <div class="card-body" id="alertas-panel"><p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas</p></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>🤰 Partos próximos</h3></div>
-            <div class="card-body" id="partos-panel"><p style="color:var(--gris-texto);font-size:0.85rem">Sin gestaciones</p></div>
-          </div>
-        </div>
-        <div class="card" style="margin-top:0">
-          <div class="card-header"><h3>📊 Producción de leche — últimos 7 días</h3></div>
-          <div class="card-body"><div id="grafico-leche" style="display:flex;align-items:flex-end;gap:10px;height:100px"></div></div>
-        </div>
-      </div>
-
-      <!-- ============ ANIMALES ============ -->
-      <div class="page" id="page-animales">
-        <div class="section-title">
-          <div><h2>🐄 Mis animales</h2><p>Clic en un animal para ver su ficha completa</p></div>
-          <button class="btn btn-verde" onclick="idAnimalEnEdicion=null;abrirModal('modal-animal')">+ Agregar animal</button>
-        </div>
-        <div class="card" style="margin-bottom:1rem">
-          <div class="card-body" style="padding:0.8rem 1.2rem;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-            <input type="text" placeholder="🔍 Buscar..." id="buscar-animal"
-              style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem;width:180px"
-              oninput="renderTablaAnimales()">
-            <select id="filtro-tipo" onchange="renderTablaAnimales()" style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem">
-              <option value="">Todos los tipos</option>
-              <option value="bovino">🐄 Bovinos</option>
-              <option value="equino">🐎 Equinos</option>
-            </select>
-            <select id="filtro-estado" onchange="renderTablaAnimales()" style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem">
-              <option value="activo">✅ Activos</option>
-              <option value="">Todos</option>
-              <option value="vendido">Vendidos</option>
-              <option value="muerto">Bajas</option>
-            </select>
-            <span id="conteo-animales" style="font-size:0.8rem;color:var(--gris-texto);margin-left:auto"></span>
-          </div>
+      <div class="stats-grid" id="stats-dashboard"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><h3>🚨 Alertas activas</h3></div>
+          <div class="card-body" id="alertas-panel"><p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas pendientes</p></div>
         </div>
         <div class="card">
-          <div class="tabla-wrap">
-            <table>
-              <thead><tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Sexo</th><th>Raza</th><th>Edad</th><th>Peso</th><th>Entrada (carne)</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody id="tbody-animales"></tbody>
-            </table>
-          </div>
+          <div class="card-header"><h3>🤰 Partos próximos</h3></div>
+          <div class="card-body" id="partos-panel"><p style="color:var(--gris-texto);font-size:0.85rem">Sin gestaciones activas</p></div>
         </div>
       </div>
-
-      <!-- ============ GANADO DE CARNE ============ -->
-      <div class="page" id="page-carne">
-        <div class="section-title">
-          <div><h2>🥩 Ganado de carne</h2><p>Control de peso, compra/venta y rentabilidad por animal</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-pesaje')">+ Registrar pesaje</button>
-        </div>
-        <div class="stats-grid" id="stats-carne"></div>
-
-        <!-- Animales activos en engorde -->
-        <div class="card">
-          <div class="card-header"><h3>🐄 Animales en engorde (activos)</h3></div>
-          <div class="tabla-wrap">
-            <table>
-              <thead><tr><th>ID</th><th>Nombre</th><th>Raza</th><th>Kg Entrada</th><th>Peso Actual</th><th>Kg Ganados</th><th>Costo Compra</th><th>Costo Vacunas</th><th>Edad</th><th>Acción</th></tr></thead>
-              <tbody id="tbody-carne-activos"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Animales vendidos con rentabilidad -->
-        <div class="card" style="margin-top:0">
-          <div class="card-header"><h3>💰 Animales vendidos — Rentabilidad</h3></div>
-          <div class="tabla-wrap">
-            <table>
-              <thead><tr><th>Animal</th><th>Raza</th><th>Entrada (kg / $)</th><th>Venta (kg / $)</th><th>Kg ganados</th><th>Costo vacunas</th><th>Ganancia neta</th><th>Tiempo</th></tr></thead>
-              <tbody id="tbody-carne-vendidos"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ LECHE ============ -->
-      <div class="page" id="page-leche">
-        <div class="section-title">
-          <div><h2>🥛 Producción de leche</h2><p>Control diario por vaca</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-leche')">+ Registrar producción</button>
-        </div>
-        <div class="stats-grid" id="stats-leche"></div>
-        <div class="card">
-          <div class="card-header"><h3>Producción por vaca (promedio últimos 7 días)</h3></div>
-          <div class="card-body"><div id="tabla-vacas-leche"></div></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3>Historial de registros</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>Fecha</th><th>Vaca</th><th>Litros</th><th>Nota</th></tr></thead>
-            <tbody id="tbody-leche"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ REPRODUCCIÓN ============ -->
-      <div class="page" id="page-reproduccion">
-        <div class="section-title">
-          <div><h2>🔁 Reproducción</h2><p>Celos, gestaciones y partos</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-repro')">+ Registrar evento</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:1.4rem">
-          <div class="stat-card"><div class="stat-label">Bovinos<span>🐄</span></div><div class="stat-value" style="font-size:1rem;color:var(--azul)">283 días</div><div class="stat-sub">Gestación promedio</div></div>
-          <div class="stat-card"><div class="stat-label">Equinos<span>🐎</span></div><div class="stat-value" style="font-size:1rem;color:var(--tierra)">340 días</div><div class="stat-sub">Gestación promedio</div></div>
-          <div class="stat-card"><div class="stat-label">Gestantes activas<span>🤰</span></div><div class="stat-value" id="total-gestantes" style="color:var(--verde-medio)">0</div></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3>Eventos reproductivos</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>Animal</th><th>Evento</th><th>Fecha</th><th>Macho</th><th>¿Gestante?</th><th>Parto estimado</th><th>Días rest.</th></tr></thead>
-            <tbody id="tbody-repro"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ SALUD ============ -->
-      <div class="page" id="page-salud">
-        <div class="section-title">
-          <div><h2>💉 Salud y vacunas</h2><p>Historial médico, alertas y costos</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-salud')">+ Registrar evento médico</button>
-        </div>
-        <div class="card" style="border-left:4px solid var(--rojo)">
-          <div class="card-header"><h3>⚠️ Alertas activas</h3></div>
-          <div class="card-body" id="alertas-salud-body"><p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas</p></div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3>Historial veterinario completo</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Costo</th><th>Fecha</th><th>Próxima</th><th>Veterinario</th></tr></thead>
-            <tbody id="tbody-salud"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ ALIMENTACIÓN ============ -->
-      <div class="page" id="page-alimentacion">
-        <div class="section-title">
-          <div><h2>🌾 Alimentación</h2><p>Control de heno y concentrado</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-alimento')">+ Registrar alimento</button>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.2rem">
-          <div class="card">
-            <div class="card-header" style="border-left:4px solid var(--verde-claro)"><h3>🌿 Heno</h3></div>
-            <div class="card-body" id="resumen-heno"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
-          </div>
-          <div class="card">
-            <div class="card-header" style="border-left:4px solid var(--tierra)"><h3>🌽 Concentrado</h3></div>
-            <div class="card-body" id="resumen-concentrado"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3>Historial de compras</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Cantidad</th><th>Kg/unidad</th><th>Consumo/día</th><th>Duración est.</th><th>Notas</th></tr></thead>
-            <tbody id="tbody-alimento"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ FINANZAS ============ -->
-      <div class="page" id="page-finanzas">
-        <div class="section-title">
-          <div><h2>💰 Control financiero</h2></div>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-outline" onclick="abrirModal('modal-venta')">+ Ingreso</button>
-            <button class="btn btn-verde" onclick="abrirModal('modal-gasto')">+ Gasto</button>
-          </div>
-        </div>
-        <div class="stats-grid" id="stats-finanzas"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div class="card">
-            <div class="card-header"><h3>Gastos por categoría</h3></div>
-            <div class="card-body" id="gastos-categoria"></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>Últimas transacciones</h3></div>
-            <div class="card-body" id="ultimas-trans"></div>
-          </div>
-        </div>
-        <div class="card" style="margin-top:1.2rem">
-          <div class="card-header"><h3>Historial completo</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th>Valor</th></tr></thead>
-            <tbody id="tbody-finanzas"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <!-- ============ INVENTARIO ============ -->
-      <div class="page" id="page-inventario">
-        <div class="section-title"><div><h2>📦 Inventario general</h2></div></div>
-        <div class="stats-grid" id="stats-inventario"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-          <div class="card">
-            <div class="card-header"><h3>Animales por tipo</h3></div>
-            <div class="card-body" id="inv-tipos"></div>
-          </div>
-          <div class="card">
-            <div class="card-header"><h3>Animales por raza</h3></div>
-            <div class="card-body" id="inv-razas"></div>
-          </div>
-        </div>
-        <div class="card" style="margin-top:1.2rem">
-          <div class="card-header"><h3>Inventario completo</h3></div>
-          <div class="tabla-wrap">
-            <table><thead><tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Sexo</th><th>Raza</th><th>Edad</th><th>Peso</th><th>Estado</th></tr></thead>
-            <tbody id="tbody-inventario"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- ============ POTREROS ============ -->
-      <div class="page" id="page-potreros">
-        <div class="section-title">
-          <div><h2>🌿 Potreros y pesebreras</h2><p>Asigna animales y controla la rotación de pastoreo</p></div>
-          <button class="btn btn-verde" onclick="abrirModal('modal-potrero')">+ Crear potrero</button>
-        </div>
-        <div class="stats-grid" id="stats-potreros"></div>
-        <div id="grid-potreros" class="potreros-grid"></div>
-      </div>
-
-    </div><!-- fin #main -->
-  </div><!-- fin #app-principal -->
-
-
-  <!-- ==================== MODALES ==================== -->
-
-  <!-- Modal: Configurar finca -->
-  <div class="modal-overlay" id="modal-config">
-    <div class="modal">
-      <div class="modal-header"><h3>⚙️ Configurar mi finca</h3><button class="modal-close" onclick="cerrarModal('modal-config')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group form-full"><label>Nombre de la finca</label><input type="text" id="config-nombre" placeholder="Ej: Finca La Esperanza"></div>
-          <div class="form-group form-full"><label>Tu nombre / Propietario</label><input type="text" id="config-propietario" placeholder="Tu nombre"></div>
-          <div class="form-group form-full"><label>Municipio / Vereda</label><input type="text" id="config-lugar" placeholder="Ej: Rionegro, Antioquia"></div>
-          <div class="form-group form-full">
-            <label>Perfil / Tipo de finca</label>
-            <select id="config-perfil" style="padding:8px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.85rem">
-              <option value="lechero">🥛 Vacas lecheras</option>
-              <option value="carne">🥩 Ganado de carne</option>
-              <option value="equino">🐎 Solo caballos</option>
-              <option value="mixto">🐄🐎 Mixto (vacas + caballos)</option>
-              <option value="completo">🌿 Finca completa</option>
-            </select>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-config')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarConfig()">💾 Guardar</button>
-          </div>
+      <div class="card" style="margin-top:0">
+        <div class="card-header"><h3>📊 Producción de leche — últimos 7 días</h3></div>
+        <div class="card-body">
+          <div id="grafico-leche" style="display:flex;align-items:flex-end;gap:10px;height:100px"></div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Modal: Agregar / editar animal -->
-  <div class="modal-overlay" id="modal-animal">
-    <div class="modal" style="max-width:640px">
-      <div class="modal-header"><h3>🐄 Agregar animal</h3><button class="modal-close" onclick="cerrarModal('modal-animal')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Tipo <span class="req">*</span></label>
-            <select id="a-tipo" onchange="actualizarCamposCarne()">
-              <option value="bovino">🐄 Bovino</option>
-              <option value="equino">🐎 Equino</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Nombre <span class="req">*</span></label><input type="text" id="a-nombre" placeholder="Ej: Valentina"></div>
-          <div class="form-group"><label>Sexo <span class="req">*</span></label>
-            <select id="a-sexo"><option value="hembra">Hembra</option><option value="macho">Macho</option></select>
-          </div>
-          <div class="form-group"><label>Raza</label><input type="text" id="a-raza" placeholder="Ej: Angus, Brahman"></div>
-          <div class="form-group"><label>Fecha nacimiento / ingreso <span class="req">*</span></label><input type="date" id="a-nacimiento"></div>
-          <div class="form-group"><label>Peso actual (kg) <span class="req">*</span></label><input type="number" id="a-peso" placeholder="Ej: 320"></div>
-          <div class="form-group"><label>Procedencia</label>
-            <select id="a-procedencia"><option value="nacido">Nacido en finca</option><option value="comprado">Comprado</option><option value="importado">Importado</option></select>
-          </div>
-          <div class="form-group"><label>Estado</label>
-            <select id="a-estado"><option value="activo">Activo</option><option value="vendido">Vendido</option><option value="muerto">Muerto / Baja</option></select>
-          </div>
-          <!-- Campos exclusivos para carne -->
-          <div id="campos-carne" style="display:contents">
-            <div class="form-group" style="border-top:2px solid var(--verde-claro);padding-top:10px;grid-column:1/-1">
-              <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--verde-medio);margin-bottom:4px">🥩 Datos de entrada (carne)</p>
-            </div>
-            <div class="form-group"><label>Kg al ingresar</label><input type="number" id="a-kg-compra" placeholder="Ej: 180"></div>
-            <div class="form-group"><label>Precio de compra ($)</label><input type="number" id="a-precio-compra" placeholder="Ej: 1800000"></div>
-          </div>
-          <div class="form-group"><label>ID Madre (opcional)</label><input type="text" id="a-madre" placeholder="BOV-001"></div>
-          <div class="form-group"><label>ID Padre (opcional)</label><input type="text" id="a-padre" placeholder="BOV-003"></div>
-          <div class="form-group form-full"><label>Notas</label><textarea id="a-notas" rows="2"></textarea></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-animal')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarAnimal()">💾 Guardar animal</button>
-          </div>
+    <!-- ANIMALES -->
+    <div class="page" id="page-animales">
+      <div class="section-title">
+        <div><h2>🐴 Mis animales</h2><p>Haz clic en un animal para ver su ficha</p></div>
+        <button class="btn btn-verde" onclick="idAnimalEnEdicion=null;abrirModal('modal-animal')">+ Agregar animal</button>
+      </div>
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-body" style="padding:0.8rem 1.2rem;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <input type="text" placeholder="🔍 Buscar..." id="buscar-animal"
+            style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem;width:180px"
+            oninput="renderTablaAnimales()">
+          <select id="filtro-tipo" onchange="renderTablaAnimales()" style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem">
+            <option value="">Todos los tipos</option>
+            <option value="bovino">🐄 Bovinos</option>
+            <option value="equino">🐎 Equinos</option>
+          </select>
+          <select id="filtro-estado" onchange="renderTablaAnimales()" style="padding:7px 11px;border:1px solid var(--gris-borde);border-radius:8px;font-family:Nunito;font-size:0.83rem">
+            <option value="activo">✅ Activos</option>
+            <option value="">Todos</option>
+            <option value="vendido">💵 Vendidos</option>
+            <option value="muerto">💀 Bajas</option>
+          </select>
+          <span id="conteo-animales" style="font-size:0.8rem;color:var(--gris-texto);margin-left:auto"></span>
         </div>
       </div>
-    </div>
-  </div>
-
-  <!-- Modal: Ficha animal -->
-  <div class="modal-overlay" id="modal-ficha">
-    <div class="modal" style="max-width:640px">
-      <div class="modal-header"><h3>📋 Ficha del animal</h3><button class="modal-close" onclick="cerrarModal('modal-ficha')">×</button></div>
-      <div class="modal-body" id="ficha-contenido"></div>
-    </div>
-  </div>
-
-  <!-- Modal: Pesaje (módulo carne) -->
-  <div class="modal-overlay" id="modal-pesaje">
-    <div class="modal" style="max-width:520px">
-      <div class="modal-header"><h3>⚖️ Registrar pesaje</h3><button class="modal-close" onclick="cerrarModal('modal-pesaje')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group form-full"><label>Animal <span class="req">*</span></label><select id="p-animal"></select></div>
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="p-fecha"></div>
-          <div class="form-group"><label>Tipo de pesaje</label>
-            <select id="p-tipo">
-              <option value="entrada">🟢 Entrada / Compra</option>
-              <option value="control">📊 Control de peso</option>
-              <option value="salida">🔴 Salida / Venta</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Peso (kg) <span class="req">*</span></label><input type="number" step="0.1" id="p-kg" placeholder="Ej: 320.5"></div>
-          <div class="form-group"><label>Valor / Precio ($)</label><input type="number" id="p-costo" placeholder="Para compra o venta"></div>
-          <div class="form-group form-full"><label>Notas</label><input type="text" id="p-notas"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-pesaje')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarPesaje()">💾 Guardar pesaje</button>
-          </div>
-        </div>
-        <div class="ayuda">
-          <strong>Tipos de pesaje:</strong>
-          🟢 <strong>Entrada</strong>: registro del peso al comprar/ingresar el animal.<br>
-          📊 <strong>Control</strong>: seguimiento mensual del engorde.<br>
-          🔴 <strong>Salida</strong>: peso al vender — calcula automáticamente la ganancia neta.
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Leche -->
-  <div class="modal-overlay" id="modal-leche">
-    <div class="modal">
-      <div class="modal-header"><h3>🥛 Registrar producción</h3><button class="modal-close" onclick="cerrarModal('modal-leche')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Vaca <span class="req">*</span></label><select id="l-vaca"></select></div>
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="l-fecha"></div>
-          <div class="form-group"><label>Litros <span class="req">*</span></label><input type="number" step="0.1" id="l-litros" placeholder="Ej: 18.5"></div>
-          <div class="form-group"><label>Nota</label><input type="text" id="l-nota" placeholder="Ej: mañana"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-leche')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarLeche()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Reproducción -->
-  <div class="modal-overlay" id="modal-repro">
-    <div class="modal" style="max-width:580px">
-      <div class="modal-header"><h3>🔁 Evento reproductivo</h3><button class="modal-close" onclick="cerrarModal('modal-repro')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Animal (hembra) <span class="req">*</span></label><select id="r-animal"></select></div>
-          <div class="form-group"><label>Tipo de evento</label>
-            <select id="r-tipo"><option value="celo">Celo</option><option value="inseminacion">Inseminación</option><option value="monta">Monta natural</option><option value="parto">Parto</option></select>
-          </div>
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="r-fecha"></div>
-          <div class="form-group"><label>Macho utilizado</label><input type="text" id="r-macho" placeholder="ID o nombre"></div>
-          <div class="form-group"><label>¿Quedó gestante?</label>
-            <select id="r-gestante"><option value="no">No / Pendiente</option><option value="si">Sí, confirmada</option></select>
-          </div>
-          <div class="form-group"><label>Observaciones</label><input type="text" id="r-obs"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-repro')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarRepro()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Salud (con campo costo) -->
-  <div class="modal-overlay" id="modal-salud">
-    <div class="modal" style="max-width:620px">
-      <div class="modal-header"><h3>💉 Evento médico</h3><button class="modal-close" onclick="cerrarModal('modal-salud')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Animal <span class="req">*</span></label><select id="s-animal"></select></div>
-          <div class="form-group"><label>Tipo</label>
-            <select id="s-tipo"><option value="vacuna">💉 Vacuna</option><option value="desparasitacion">🪱 Desparasitación</option><option value="herraje">🔩 Herraje</option><option value="odontologia">🦷 Odontología</option><option value="vitamina">💊 Vitaminas</option><option value="otro">🏥 Otro</option></select>
-          </div>
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="s-fecha"></div>
-          <div class="form-group"><label>Próxima fecha (alerta)</label><input type="date" id="s-proxima"></div>
-          <div class="form-group"><label>Medicamento</label><input type="text" id="s-medicamento"></div>
-          <div class="form-group"><label>Dosis</label><input type="text" id="s-dosis" placeholder="Ej: 5ml"></div>
-          <div class="form-group"><label>Costo ($)</label><input type="number" id="s-costo" placeholder="Ej: 45000"></div>
-          <div class="form-group form-full"><label>Descripción</label><input type="text" id="s-desc"></div>
-          <div class="form-group form-full"><label>Veterinario</label><input type="text" id="s-vet"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-salud')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarSalud()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Alimento -->
-  <div class="modal-overlay" id="modal-alimento">
-    <div class="modal" style="max-width:560px">
-      <div class="modal-header"><h3>🌾 Registrar alimento</h3><button class="modal-close" onclick="cerrarModal('modal-alimento')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Tipo <span class="req">*</span></label>
-            <select id="al-tipo"><option value="heno">🌿 Heno</option><option value="concentrado">🌽 Concentrado</option></select>
-          </div>
-          <div class="form-group"><label>Fecha de compra <span class="req">*</span></label><input type="date" id="al-fecha"></div>
-          <div class="form-group"><label>Cantidad (pacas/costales) <span class="req">*</span></label><input type="number" id="al-cantidad"></div>
-          <div class="form-group"><label>Kg por unidad <span class="req">*</span></label><input type="number" step="0.1" id="al-kg"></div>
-          <div class="form-group"><label>Consumo diario (kg)</label><input type="number" step="0.1" id="al-consumo"></div>
-          <div class="form-group"><label>Costo total ($)</label><input type="number" id="al-costo"></div>
-          <div class="form-group form-full"><label>Notas</label><input type="text" id="al-notas"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-alimento')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarAlimento()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Gasto -->
-  <div class="modal-overlay" id="modal-gasto">
-    <div class="modal">
-      <div class="modal-header"><h3>💸 Registrar gasto</h3><button class="modal-close" onclick="cerrarModal('modal-gasto')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="g-fecha"></div>
-          <div class="form-group"><label>Categoría</label>
-            <select id="g-cat"><option value="alimentacion">🌾 Alimentación</option><option value="salud">💉 Salud</option><option value="infraestructura">🏗️ Infraestructura</option><option value="mano_obra">👷 Mano de obra</option><option value="compra_animal">🐄 Compra animal</option><option value="otro">📌 Otro</option></select>
-          </div>
-          <div class="form-group"><label>Valor ($) <span class="req">*</span></label><input type="number" id="g-valor"></div>
-          <div class="form-group"><label>Proveedor</label><input type="text" id="g-prov"></div>
-          <div class="form-group form-full"><label>Descripción <span class="req">*</span></label><input type="text" id="g-desc"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-gasto')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarGasto()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Ingreso / Venta -->
-  <div class="modal-overlay" id="modal-venta">
-    <div class="modal">
-      <div class="modal-header"><h3>📈 Registrar ingreso</h3><button class="modal-close" onclick="cerrarModal('modal-venta')">×</button></div>
-      <div class="modal-body">
-        <div class="form-grid">
-          <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="v-fecha"></div>
-          <div class="form-group"><label>Tipo de ingreso</label>
-            <select id="v-tipo"><option value="venta_animal">🐄 Venta de animal</option><option value="venta_leche">🥛 Venta de leche</option><option value="otro">📌 Otro ingreso</option></select>
-          </div>
-          <div class="form-group"><label>Valor ($) <span class="req">*</span></label><input type="number" id="v-valor"></div>
-          <div class="form-group"><label>Comprador / Cliente</label><input type="text" id="v-cliente"></div>
-          <div class="form-group form-full"><label>Descripción <span class="req">*</span></label><input type="text" id="v-desc"></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-venta')">Cancelar</button>
-            <button class="btn btn-tierra" onclick="guardarVenta()">💾 Guardar ingreso</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- Modal: Crear / editar potrero -->
-  <div class="modal-overlay" id="modal-potrero">
-    <div class="modal" style="max-width:520px">
-      <div class="modal-header"><h3>🌿 Potrero / Pesebrera</h3><button class="modal-close" onclick="cerrarModal('modal-potrero');limpiarFormPotrero()">×</button></div>
-      <div class="modal-body">
-        <input type="hidden" id="pt-id-edicion">
-        <div class="form-grid">
-          <div class="form-group form-full"><label>Nombre <span class="req">*</span></label><input type="text" id="pt-nombre" placeholder="Ej: Potrero Norte, Pesebrera 1"></div>
-          <div class="form-group"><label>Tipo</label>
-            <select id="pt-tipo">
-              <option value="potrero">🌿 Potrero</option>
-              <option value="pesebrera">🏠 Pesebrera</option>
-            </select>
-          </div>
-          <div class="form-group"><label>Hectáreas</label><input type="number" step="0.1" id="pt-hectareas" placeholder="Ej: 5.5"></div>
-          <div class="form-group"><label>Capacidad (animales)</label><input type="number" id="pt-capacidad" placeholder="Ej: 12" value="10"></div>
-          <div class="form-group form-full"><label>Tipo de pasto</label><input type="text" id="pt-pasto" placeholder="Ej: Kikuyo, Estrella, Maralfalfa"></div>
-          <div class="form-group form-full"><label>Notas</label><input type="text" id="pt-notas" placeholder="Observaciones, estado del pasto..."></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-potrero');limpiarFormPotrero()">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarPotrero()">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Asignar animal a potrero -->
-  <div class="modal-overlay" id="modal-asignar-animal">
-    <div class="modal" style="max-width:420px">
-      <div class="modal-header"><h3>➕ Asignar animal</h3><button class="modal-close" onclick="cerrarModal('modal-asignar-animal')">×</button></div>
-      <div class="modal-body">
-        <input type="hidden" id="asig-potrero-id">
-        <div class="form-grid">
-          <div class="form-group form-full"><label>Animal <span class="req">*</span></label><select id="asig-animal"></select></div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-asignar-animal')">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarAsignacion()">✅ Asignar</button>
-          </div>
-        </div>
-        <div class="ayuda">Un animal solo puede estar en un potrero a la vez. Si ya estaba en otro, se mueve automáticamente.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Rotación de pastoreo -->
-  <div class="modal-overlay" id="modal-rotacion">
-    <div class="modal" style="max-width:480px">
-      <div class="modal-header"><h3>🔄 Rotación de pastoreo</h3><button class="modal-close" onclick="cerrarModal('modal-rotacion')">×</button></div>
-      <div class="modal-body">
-        <input type="hidden" id="rot-potrero-origen">
-        <p style="font-size:0.82rem;color:var(--gris-texto);margin-bottom:12px">
-          Moviendo animales desde: <strong id="rot-potrero-origen-nombre"></strong>
-        </p>
-        <div class="form-group" style="margin-bottom:14px">
-          <label>Potrero de destino <span class="req">*</span></label>
-          <select id="rot-potrero-destino"></select>
-        </div>
-        <div class="form-group">
-          <label>Animales a mover</label>
-          <div id="rot-animales" style="max-height:180px;overflow-y:auto;border:1px solid var(--gris-borde);border-radius:8px;padding:8px"></div>
-        </div>
-        <div class="form-actions" style="margin-top:14px">
-          <button class="btn btn-outline" onclick="cerrarModal('modal-rotacion')">Cancelar</button>
-          <button class="btn btn-verde" onclick="ejecutarRotacion()">🔄 Mover animales</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Gráfica de peso / engorde -->
-  <div class="modal-overlay" id="modal-grafica-peso">
-    <div class="modal" style="max-width:640px">
-      <div class="modal-header">
-        <h3 id="grafica-peso-titulo">📈 Curva de engorde</h3>
-        <button class="modal-close" onclick="cerrarModal('modal-grafica-peso')">×</button>
-      </div>
-      <div class="modal-body" id="grafica-peso-svg"></div>
-    </div>
-  </div>
-
-  <!-- Modal: Búsqueda global -->
-  <div class="modal-overlay" id="modal-busqueda">
-    <div class="modal" style="max-width:600px;margin-top:6vh">
-      <div class="modal-header" style="padding:0.8rem 1rem">
-        <div style="display:flex;align-items:center;gap:10px;width:100%">
-          <span style="font-size:1.1rem">🔍</span>
-          <input type="text" id="busqueda-input" placeholder="Buscar animales, vacunas, gastos, potreros... (Ctrl+K)"
-            oninput="ejecutarBusqueda()"
-            style="flex:1;border:none;outline:none;font-family:Nunito;font-size:0.95rem;background:transparent">
-          <button class="modal-close" onclick="cerrarBusquedaGlobal()">×</button>
-        </div>
-      </div>
-      <div class="modal-body" style="padding:0.6rem 1rem 1rem">
-        <div id="busqueda-resultados">
-          <p class="busqueda-hint">Escribe para buscar en toda tu finca...</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Comparar animales -->
-  <div class="modal-overlay" id="modal-comparar">
-    <div class="modal" style="max-width:700px">
-      <div class="modal-header"><h3>⚖️ Comparar animales</h3><button class="modal-close" onclick="cerrarModal('modal-comparar')">×</button></div>
-      <div class="modal-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
-          <div class="form-group">
-            <label>Animal A</label>
-            <select id="comparar-a"></select>
-          </div>
-          <div class="form-group">
-            <label>Animal B</label>
-            <select id="comparar-b"></select>
-          </div>
-        </div>
-        <button class="btn btn-verde" style="width:100%;margin-bottom:16px" onclick="ejecutarComparador()">⚖️ Comparar ahora</button>
-        <div id="comparar-resultado"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Manual de usuario -->
-  <div class="modal-overlay" id="modal-manual">
-    <div class="modal" style="max-width:760px;height:85vh;display:flex;flex-direction:column">
-      <div class="modal-header"><h3>📖 Manual de uso — Mi Finca</h3><button class="modal-close" onclick="cerrarModal('modal-manual')">×</button></div>
-      <div style="display:flex;flex:1;overflow:hidden">
-        <div id="manual-nav" style="width:190px;flex-shrink:0;border-right:1px solid var(--gris-borde);overflow-y:auto;padding:0.6rem 0;background:var(--crema)"></div>
-        <div id="manual-contenido" style="flex:1;overflow-y:auto;padding:1.4rem"></div>
-      </div>
-    </div>
-  </div>
-
-
-
-  <!-- Modal: Gestión de usuarios (solo propietario) -->
-  <div class="modal-overlay" id="modal-usuarios">
-    <div class="modal" style="max-width:720px">
-      <div class="modal-header">
-        <h3>👥 Gestión de usuarios</h3>
-        <button class="modal-close" onclick="cerrarModal('modal-usuarios')">×</button>
-      </div>
-      <div class="modal-body">
-
-        <!-- Código de finca -->
-        <div class="codigo-finca-box">
-          <div>
-            <p class="codigo-finca-label">🔑 Código de finca</p>
-            <p style="font-size:0.75rem;color:var(--gris-texto);margin-top:2px">
-              Comparte este código con tus trabajadores para que puedan ingresar
-            </p>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <code id="codigo-finca-display" style="font-size:0.72rem;background:#fff;padding:6px 10px;border-radius:6px;border:1px solid var(--gris-borde);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-              Cargando...
-            </code>
-            <button class="btn btn-sm btn-verde" onclick="copiarCodigoFinca()">📋 Copiar</button>
-          </div>
-        </div>
-
-        <!-- Botón nuevo usuario -->
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:10px">
-          <p style="font-size:0.82rem;color:var(--gris-texto)"><strong id="conteo-trabajadores">0</strong> usuario(s) creado(s)</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-usuarios')">Cerrar</button>
-            <button class="btn btn-verde" onclick="limpiarFormUsuario();abrirModal('modal-nuevo-usuario')">+ Nuevo usuario</button>
-          </div>
-        </div>
-
-        <!-- Tabla de usuarios -->
+      <div class="card">
         <div class="tabla-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>Nombre / Correo</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Creado</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="tbody-usuarios"></tbody>
+            <thead><tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Sexo</th><th>Raza</th><th>Edad</th><th>Peso</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <tbody id="tbody-animales"></tbody>
           </table>
         </div>
-
-        <!-- Info de roles -->
-        <div style="margin-top:1.2rem">
-          <p style="font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--gris-texto);margin-bottom:8px">Descripción de roles</p>
-          <div class="roles-grid">
-            <div class="rol-info-card" style="border-left-color:#1b4332">
-              <strong>👑 Propietario</strong>
-              <p>Acceso total. Crea y gestiona usuarios.</p>
-            </div>
-            <div class="rol-info-card" style="border-left-color:#2d6a4f">
-              <strong>👨‍💼 Administrador</strong>
-              <p>Todo excepto gestión de usuarios y configuración.</p>
-            </div>
-            <div class="rol-info-card" style="border-left-color:#52b788">
-              <strong>🧑‍🌾 Ordeñador</strong>
-              <p>Registra producción de leche. Ve animales y potreros.</p>
-            </div>
-            <div class="rol-info-card" style="border-left-color:#1a6fa8">
-              <strong>💉 Veterinario</strong>
-              <p>Salud, vacunas y reproducción. Ve animales.</p>
-            </div>
-            <div class="rol-info-card" style="border-left-color:#7c5c3c">
-              <strong>⚖️ Pesador</strong>
-              <p>Registra pesajes de ganado. Ve animales.</p>
-            </div>
-            <div class="rol-info-card" style="border-left-color:#888">
-              <strong>👁️ Solo lectura</strong>
-              <p>Ve todo pero no puede editar ni registrar nada.</p>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
-  </div>
 
-  <!-- Modal: Crear / editar usuario -->
-  <div class="modal-overlay" id="modal-nuevo-usuario">
-    <div class="modal" style="max-width:460px">
-      <div class="modal-header">
-        <h3>👤 Nuevo usuario</h3>
-        <button class="modal-close" onclick="cerrarModal('modal-nuevo-usuario');limpiarFormUsuario()">×</button>
+    <!-- LECHE -->
+    <div class="page" id="page-leche">
+      <div class="section-title">
+        <div><h2>🥛 Producción de leche</h2><p>Control diario por vaca</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-leche')">+ Registrar producción</button>
       </div>
-      <div class="modal-body">
-        <input type="hidden" id="u-id-edicion">
-        <div class="form-grid">
-          <div class="form-group form-full">
-            <label>Nombre completo <span class="req">*</span></label>
-            <input type="text" id="u-nombre" placeholder="Ej: Carlos Pérez">
-          </div>
-          <div class="form-group form-full">
-            <label>Correo de acceso <span class="req">*</span></label>
-            <input type="email" id="u-correo" placeholder="Ej: carlos@finca.com">
-          </div>
-          <div class="form-group form-full">
-            <label>Contraseña <span class="req">*</span></label>
-            <input type="password" id="u-pass" placeholder="Mínimo 4 caracteres">
-          </div>
-          <div class="form-group form-full">
-            <label>Rol</label>
-            <select id="u-rol">
-              <option value="administrador">👨‍💼 Administrador</option>
-              <option value="ordeñador" selected>🧑‍🌾 Ordeñador</option>
-              <option value="veterinario">💉 Veterinario</option>
-              <option value="pesador">⚖️ Pesador</option>
-              <option value="lectura">👁️ Solo lectura</option>
-            </select>
-          </div>
-          <div class="form-actions">
-            <button class="btn btn-outline" onclick="cerrarModal('modal-nuevo-usuario');limpiarFormUsuario()">Cancelar</button>
-            <button class="btn btn-verde" onclick="guardarUsuario()">💾 Guardar usuario</button>
-          </div>
-        </div>
-        <div class="ayuda" style="margin-top:10px">
-          <strong>Después de crear el usuario</strong>, el sistema mostrará el
-          <strong>Código de finca</strong> y los datos de acceso para compartir con el trabajador.
-          Él los ingresa en la pantalla de login → pestaña "Soy trabajador".
+      <div class="stats-grid" id="stats-leche"></div>
+      <div class="card">
+        <div class="card-header"><h3>Producción por vaca (promedio últimos 7 días)</h3></div>
+        <div class="card-body"><div id="tabla-vacas-leche"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Historial de registros</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Fecha</th><th>Vaca</th><th>Litros</th><th>Nota</th></tr></thead>
+          <tbody id="tbody-leche"></tbody></table>
         </div>
       </div>
     </div>
-  </div>
 
-  <script src="app.js"></script>
-  </body>
-  </html>
+    <!-- REPRODUCCIÓN -->
+    <div class="page" id="page-reproduccion">
+      <div class="section-title">
+        <div><h2>🧬 Reproducción</h2><p>Celos, gestaciones y partos</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-repro')">+ Registrar evento</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:1.4rem">
+        <div class="stat-card">
+          <div class="stat-label">Bovinos<span>🐄</span></div>
+          <div class="stat-value" style="font-size:1rem;color:var(--azul)">283 días</div>
+          <div class="stat-sub">Gestación promedio</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Equinos<span>🐎</span></div>
+          <div class="stat-value" style="font-size:1rem;color:var(--tierra)">340 días</div>
+          <div class="stat-sub">Gestación promedio</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Gestantes activas<span>🤰</span></div>
+          <div class="stat-value" id="total-gestantes" style="color:var(--verde-medio)">0</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Eventos reproductivos</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Animal</th><th>Evento</th><th>Fecha</th><th>Macho</th><th>¿Gestante?</th><th>Parto estimado</th><th>Días rest.</th></tr></thead>
+          <tbody id="tbody-repro"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SALUD -->
+    <div class="page" id="page-salud">
+      <div class="section-title">
+        <div><h2>💉 Salud y vacunas</h2><p>Historial médico y alertas</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-salud')">+ Registrar evento médico</button>
+      </div>
+      <div class="card" style="border-left:4px solid var(--rojo)">
+        <div class="card-header"><h3>⚠️ Alertas activas</h3></div>
+        <div class="card-body" id="alertas-salud-body"><p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas</p></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Historial veterinario completo</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Fecha</th><th>Próxima</th><th>Veterinario</th></tr></thead>
+          <tbody id="tbody-salud"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALIMENTACIÓN -->
+    <div class="page" id="page-alimentacion">
+      <div class="section-title">
+        <div><h2>🌾 Alimentación</h2><p>Control de heno y concentrado</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-alimento')">+ Registrar alimento</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.2rem">
+        <div class="card">
+          <div class="card-header" style="border-left:4px solid var(--verde-claro)"><h3>🌿 Heno</h3></div>
+          <div class="card-body" id="resumen-heno"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-header" style="border-left:4px solid var(--tierra)"><h3>🌽 Concentrado</h3></div>
+          <div class="card-body" id="resumen-concentrado"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Historial de compras</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Cantidad</th><th>Kg/unidad</th><th>Consumo/día</th><th>Duración est.</th><th>Notas</th></tr></thead>
+          <tbody id="tbody-alimento"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANZAS -->
+    <div class="page" id="page-finanzas">
+      <div class="section-title">
+        <div><h2>💰 Control financiero</h2></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" onclick="abrirModal('modal-venta')">+ Ingreso</button>
+          <button class="btn btn-verde" onclick="abrirModal('modal-gasto')">+ Gasto</button>
+        </div>
+      </div>
+      <div class="stats-grid" id="stats-finanzas"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><h3>Gastos por categoría</h3></div>
+          <div class="card-body" id="gastos-categoria"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Últimas transacciones</h3></div>
+          <div class="card-body" id="ultimas-trans"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.2rem">
+        <div class="card-header"><h3>Historial completo</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th>Valor</th></tr></thead>
+          <tbody id="tbody-finanzas"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div class="page" id="page-inventario">
+      <div class="section-title">
+        <div><h2>📦 Inventario general</h2></div>
+      </div>
+      <div class="stats-grid" id="stats-inventario"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div class="card-header"><h3>Animales por tipo</h3></div>
+          <div class="card-body" id="inv-tipos"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Animales por raza</h3></div>
+          <div class="card-body" id="inv-razas"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.2rem">
+        <div class="card-header"><h3>Inventario completo</h3></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Sexo</th><th>Raza</th><th>Edad</th><th>Peso</th><th>Estado</th></tr></thead>
+          <tbody id="tbody-inventario"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- fin #main -->
+</div><!-- fin #app-principal -->
+
+
+<!-- ==================== MODALES ==================== -->
+
+<!-- Modal: Configurar finca -->
+<div class="modal-overlay" id="modal-config">
+  <div class="modal">
+    <div class="modal-header"><h3>⚙️ Configurar mi finca</h3><button class="modal-close" onclick="cerrarModal('modal-config')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label>Nombre de la finca</label><input type="text" id="config-nombre" placeholder="Ej: Finca La Esperanza"></div>
+        <div class="form-group form-full"><label>Tu nombre / Propietario</label><input type="text" id="config-propietario" placeholder="Tu nombre"></div>
+        <div class="form-group form-full"><label>Municipio / Vereda</label><input type="text" id="config-lugar" placeholder="Ej: Rionegro, Antioquia"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-config')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarConfig()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Agregar / editar animal -->
+<div class="modal-overlay" id="modal-animal">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header"><h3>🐄 Agregar animal</h3><button class="modal-close" onclick="cerrarModal('modal-animal')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="a-tipo"><option value="bovino">🐄 Bovino</option><option value="equino">🐎 Equino</option></select></div>
+        <div class="form-group"><label>Nombre <span class="req">*</span></label><input type="text" id="a-nombre" placeholder="Ej: Valentina"></div>
+        <div class="form-group"><label>Sexo <span class="req">*</span></label><select id="a-sexo"><option value="hembra">Hembra</option><option value="macho">Macho</option></select></div>
+        <div class="form-group"><label>Raza</label><input type="text" id="a-raza" placeholder="Ej: Holstein, Paso Fino"></div>
+        <div class="form-group"><label>Fecha de nacimiento <span class="req">*</span></label><input type="date" id="a-nacimiento"></div>
+        <div class="form-group"><label>Peso actual (kg) <span class="req">*</span></label><input type="number" id="a-peso" placeholder="Ej: 450"></div>
+        <div class="form-group"><label>Procedencia</label><select id="a-procedencia"><option value="nacido">Nacido en finca</option><option value="comprado">Comprado</option><option value="importado">Importado</option></select></div>
+        <div class="form-group"><label>Estado</label><select id="a-estado"><option value="activo">Activo</option><option value="vendido">Vendido</option><option value="muerto">Muerto / Baja</option></select></div>
+        <div class="form-group"><label>ID Madre (opcional)</label><input type="text" id="a-madre" placeholder="Ej: BOV-001"></div>
+        <div class="form-group"><label>ID Padre (opcional)</label><input type="text" id="a-padre" placeholder="Ej: BOV-003"></div>
+        <div class="form-group form-full"><label>Notas</label><textarea id="a-notas" rows="2"></textarea></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-animal')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarAnimal()">💾 Guardar animal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ficha del animal -->
+<div class="modal-overlay" id="modal-ficha">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header"><h3>📋 Ficha del animal</h3><button class="modal-close" onclick="cerrarModal('modal-ficha')">×</button></div>
+    <div class="modal-body" id="ficha-contenido"></div>
+  </div>
+</div>
+
+<!-- Modal: Registrar leche -->
+<div class="modal-overlay" id="modal-leche">
+  <div class="modal">
+    <div class="modal-header"><h3>🥛 Registrar producción de leche</h3><button class="modal-close" onclick="cerrarModal('modal-leche')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Vaca <span class="req">*</span></label><select id="l-vaca"></select></div>
+        <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="l-fecha"></div>
+        <div class="form-group"><label>Litros producidos <span class="req">*</span></label><input type="number" step="0.1" id="l-litros" placeholder="Ej: 18.5"></div>
+        <div class="form-group"><label>Nota (opcional)</label><input type="text" id="l-nota" placeholder="Ej: mañana"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-leche')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarLeche()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Reproducción -->
+<div class="modal-overlay" id="modal-repro">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header"><h3>🧬 Registrar evento reproductivo</h3><button class="modal-close" onclick="cerrarModal('modal-repro')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Animal (hembra) <span class="req">*</span></label><select id="r-animal"></select></div>
+        <div class="form-group"><label>Tipo de evento</label><select id="r-tipo"><option value="celo">Celo</option><option value="inseminacion">Inseminación artificial</option><option value="monta">Monta natural</option><option value="parto">Parto</option></select></div>
+        <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="r-fecha"></div>
+        <div class="form-group"><label>Macho utilizado</label><input type="text" id="r-macho" placeholder="ID o nombre"></div>
+        <div class="form-group"><label>¿Quedó gestante?</label><select id="r-gestante"><option value="no">No / Pendiente</option><option value="si">Sí, confirmada</option></select></div>
+        <div class="form-group"><label>Observaciones</label><input type="text" id="r-obs"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-repro')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarRepro()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Salud -->
+<div class="modal-overlay" id="modal-salud">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header"><h3>💉 Registrar evento médico</h3><button class="modal-close" onclick="cerrarModal('modal-salud')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Animal <span class="req">*</span></label><select id="s-animal"></select></div>
+        <div class="form-group"><label>Tipo</label><select id="s-tipo"><option value="vacuna">💉 Vacuna</option><option value="desparasitacion">🪱 Desparasitación</option><option value="herraje">🔩 Herraje</option><option value="odontologia">🦷 Odontología</option><option value="vitamina">💊 Vitaminas</option><option value="otro">🏥 Otro</option></select></div>
+        <div class="form-group"><label>Fecha del evento <span class="req">*</span></label><input type="date" id="s-fecha"></div>
+        <div class="form-group"><label>Próxima fecha (para alerta)</label><input type="date" id="s-proxima"></div>
+        <div class="form-group"><label>Medicamento</label><input type="text" id="s-medicamento"></div>
+        <div class="form-group"><label>Dosis</label><input type="text" id="s-dosis" placeholder="Ej: 5ml"></div>
+        <div class="form-group form-full"><label>Descripción</label><input type="text" id="s-desc"></div>
+        <div class="form-group form-full"><label>Veterinario</label><input type="text" id="s-vet"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-salud')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarSalud()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Alimento -->
+<div class="modal-overlay" id="modal-alimento">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><h3>🌾 Registrar alimento</h3><button class="modal-close" onclick="cerrarModal('modal-alimento')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="al-tipo"><option value="heno">🌿 Heno</option><option value="concentrado">🌽 Concentrado</option></select></div>
+        <div class="form-group"><label>Fecha de compra <span class="req">*</span></label><input type="date" id="al-fecha"></div>
+        <div class="form-group"><label>Cantidad (pacas/costales) <span class="req">*</span></label><input type="number" id="al-cantidad"></div>
+        <div class="form-group"><label>Kg por unidad <span class="req">*</span></label><input type="number" step="0.1" id="al-kg"></div>
+        <div class="form-group"><label>Consumo diario total (kg)</label><input type="number" step="0.1" id="al-consumo"></div>
+        <div class="form-group"><label>Costo total (pesos)</label><input type="number" id="al-costo"></div>
+        <div class="form-group form-full"><label>Notas</label><input type="text" id="al-notas"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-alimento')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarAlimento()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Gasto -->
+<div class="modal-overlay" id="modal-gasto">
+  <div class="modal">
+    <div class="modal-header"><h3>💸 Registrar gasto</h3><button class="modal-close" onclick="cerrarModal('modal-gasto')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="g-fecha"></div>
+        <div class="form-group"><label>Categoría</label><select id="g-cat"><option value="alimentacion">🌾 Alimentación</option><option value="salud">💉 Salud</option><option value="infraestructura">🏗️ Infraestructura</option><option value="mano_obra">👷 Mano de obra</option><option value="compra_animal">🐄 Compra animal</option><option value="otro">📌 Otro</option></select></div>
+        <div class="form-group"><label>Valor (pesos) <span class="req">*</span></label><input type="number" id="g-valor"></div>
+        <div class="form-group"><label>Proveedor</label><input type="text" id="g-prov"></div>
+        <div class="form-group form-full"><label>Descripción <span class="req">*</span></label><input type="text" id="g-desc"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-gasto')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarGasto()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Ingreso / Venta -->
+<div class="modal-overlay" id="modal-venta">
+  <div class="modal">
+    <div class="modal-header"><h3>📈 Registrar ingreso o venta</h3><button class="modal-close" onclick="cerrarModal('modal-venta')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="v-fecha"></div>
+        <div class="form-group"><label>Tipo de ingreso</label><select id="v-tipo"><option value="venta_animal">🐄 Venta de animal</option><option value="venta_leche">🥛 Venta de leche</option><option value="otro">📌 Otro ingreso</option></select></div>
+        <div class="form-group"><label>Valor (pesos) <span class="req">*</span></label><input type="number" id="v-valor"></div>
+        <div class="form-group"><label>Comprador / Cliente</label><input type="text" id="v-cliente"></div>
+        <div class="form-group form-full"><label>Descripción <span class="req">*</span></label><input type="text" id="v-desc"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-venta')">Cancelar</button>
+          <button class="btn btn-tierra" onclick="guardarVenta()">💾 Guardar ingreso</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JavaScript -->
+<script src="app.js"></script>
+</body>
+</html>
