@@ -141,6 +141,9 @@
       <div class="nav-item" onclick="mostrarPagina('leche')">
         <span class="icon">🥛</span> Producción leche
       </div>
+      <div class="nav-item" onclick="mostrarPagina('carne')">
+        <span class="icon">🥩</span> Producción carne
+      </div>
       <div class="nav-item" onclick="mostrarPagina('reproduccion')">
         <span class="icon">🧬</span> Reproducción
       </div>
@@ -264,8 +267,48 @@
       <div class="card">
         <div class="card-header"><h3>Historial de registros</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Fecha</th><th>Vaca</th><th>Litros</th><th>Nota</th></tr></thead>
+          <table><thead><tr><th>Fecha</th><th>Vaca</th><th>Litros</th><th>Nota</th><th>Acción</th></tr></thead>
           <tbody id="tbody-leche"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUCCIÓN DE CARNE -->
+    <div class="page" id="page-carne">
+      <div class="section-title">
+        <div><h2>🥩 Producción de carne</h2><p>Pesajes, ganancia de peso y valor estimado</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-pesaje')">+ Registrar pesaje</button>
+      </div>
+      <div class="stats-grid" id="stats-carne"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>📊 Seguimiento por animal</h3>
+          <span style="font-size:0.75rem;color:var(--gris-texto)">Últimos 5 pesajes por animal</span>
+        </div>
+        <div class="card-body" id="carne-animales">
+          <p style="color:var(--gris-texto);font-size:0.85rem">Registra pesajes para ver el seguimiento por animal.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h3>📋 Historial completo de pesajes</h3></div>
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Animal</th>
+                <th>Peso</th>
+                <th>Precio/kg</th>
+                <th>Valor total</th>
+                <th>Destino</th>
+                <th>Observaciones</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-carne"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -295,7 +338,7 @@
       <div class="card">
         <div class="card-header"><h3>Eventos reproductivos</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Animal</th><th>Evento</th><th>Fecha</th><th>Macho</th><th>¿Gestante?</th><th>Parto estimado</th><th>Días rest.</th></tr></thead>
+          <table><thead><tr><th>Animal</th><th>Evento</th><th>Fecha</th><th>Macho</th><th>¿Gestante?</th><th>Parto estimado</th><th>Días rest.</th><th>Acción</th></tr></thead>
           <tbody id="tbody-repro"></tbody></table>
         </div>
       </div>
@@ -314,7 +357,7 @@
       <div class="card">
         <div class="card-header"><h3>Historial veterinario completo</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Fecha</th><th>Próxima</th><th>Veterinario</th></tr></thead>
+          <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Fecha</th><th>Próxima</th><th>Veterinario</th><th>Acción</th></tr></thead>
           <tbody id="tbody-salud"></tbody></table>
         </div>
       </div>
@@ -339,7 +382,7 @@
       <div class="card">
         <div class="card-header"><h3>Historial de compras</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Cantidad</th><th>Kg/unidad</th><th>Consumo/día</th><th>Duración est.</th><th>Notas</th></tr></thead>
+          <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Cantidad</th><th>Kg/unidad</th><th>Consumo/día</th><th>Duración est.</th><th>Notas</th><th>Acción</th></tr></thead>
           <tbody id="tbody-alimento"></tbody></table>
         </div>
       </div>
@@ -368,7 +411,7 @@
       <div class="card" style="margin-top:1.2rem">
         <div class="card-header"><h3>Historial completo</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th>Valor</th></tr></thead>
+          <table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th>Valor</th><th>Acción</th></tr></thead>
           <tbody id="tbody-finanzas"></tbody></table>
         </div>
       </div>
@@ -470,6 +513,37 @@
         <div class="form-actions">
           <button class="btn btn-outline" onclick="cerrarModal('modal-leche')">Cancelar</button>
           <button class="btn btn-verde" onclick="guardarLeche()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Pesaje / Producción de carne -->
+<div class="modal-overlay" id="modal-pesaje">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><h3>🥩 Registrar pesaje</h3><button class="modal-close" onclick="cerrarModal('modal-pesaje')">×</button></div>
+    <div class="modal-body">
+      <div class="ayuda" style="margin-bottom:1rem">
+        💡 Registra pesajes periódicos para calcular la <strong>ganancia de peso diaria</strong> y el valor estimado del animal.
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Animal <span class="req">*</span></label><select id="p-animal"></select></div>
+        <div class="form-group"><label>Fecha del pesaje <span class="req">*</span></label><input type="date" id="p-fecha"></div>
+        <div class="form-group"><label>Peso (kg) <span class="req">*</span></label><input type="number" step="0.1" id="p-peso" placeholder="Ej: 380.5"></div>
+        <div class="form-group"><label>Precio por kg (opcional)</label><input type="number" step="100" id="p-precio" placeholder="Ej: 9500"></div>
+        <div class="form-group form-full"><label>Destino / propósito</label>
+          <select id="p-destino">
+            <option value="seguimiento">📊 Seguimiento de peso</option>
+            <option value="venta">💵 Preparación para venta</option>
+            <option value="faena">🔪 Preparación para faena</option>
+            <option value="subasta">🏷️ Subasta / feria</option>
+          </select>
+        </div>
+        <div class="form-group form-full"><label>Observaciones</label><input type="text" id="p-obs" placeholder="Ej: condición corporal buena, sin novedades"></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-pesaje')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarPesaje()">⚖️ Guardar pesaje</button>
         </div>
       </div>
     </div>

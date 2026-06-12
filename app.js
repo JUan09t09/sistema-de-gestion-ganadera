@@ -21,7 +21,7 @@ let modoTab        = 'login';
 function crearDBVacia() {
   return {
     config: { nombre: 'Mi Finca', propietario: 'Administrador', lugar: '' },
-    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: []
+    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: []
   };
 }
 
@@ -35,7 +35,8 @@ function normalizarDB(datos) {
     reproductivo: Array.isArray(seguro.reproductivo) ? seguro.reproductivo : [],
     salud:        Array.isArray(seguro.salud)        ? seguro.salud        : [],
     alimentacion: Array.isArray(seguro.alimentacion) ? seguro.alimentacion : [],
-    finanzas:     Array.isArray(seguro.finanzas)     ? seguro.finanzas     : []
+    finanzas:     Array.isArray(seguro.finanzas)     ? seguro.finanzas     : [],
+    carne:        Array.isArray(seguro.carne)        ? seguro.carne        : []
   };
 }
 
@@ -135,7 +136,6 @@ window.addEventListener('DOMContentLoaded', function() {
     mostrarConfiguracion();
   }
 
-  // Cerrar modales al hacer clic fuera
   document.querySelectorAll('.modal-overlay').forEach(function(m) {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
   });
@@ -217,7 +217,7 @@ function accionLogin() {
       .then(function(cred) {
         return firestore.collection('usuarios').doc(cred.user.uid).set({
           config: { nombre: finca, propietario: nombre, lugar: '' },
-          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [],
+          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [],
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
       })
@@ -322,6 +322,7 @@ const TITULOS = {
   dashboard:    '🏠 Panel principal',
   animales:     '🐴 Mis animales',
   leche:        '🥛 Producción de leche',
+  carne:        '🥩 Producción de carne',
   reproduccion: '🧬 Reproducción',
   salud:        '💉 Salud y vacunas',
   alimentacion: '🌾 Alimentación',
@@ -342,6 +343,7 @@ function mostrarPagina(nombre) {
   if (nombre === 'dashboard')    renderDashboard();
   if (nombre === 'animales')     renderTablaAnimales();
   if (nombre === 'leche')        renderLeche();
+  if (nombre === 'carne')        renderCarne();
   if (nombre === 'reproduccion') renderReproduccion();
   if (nombre === 'salud')        renderSalud();
   if (nombre === 'alimentacion') renderAlimentacion();
@@ -418,7 +420,8 @@ function abrirModal(id) {
   if (id === 'modal-leche')  llenarSelectVacas();
   if (id === 'modal-repro')  llenarSelectHembras();
   if (id === 'modal-salud')  llenarSelectAnimales();
-  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha'].forEach(function(fid) {
+  if (id === 'modal-pesaje') llenarSelectAnimalesCarne();
+  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha'].forEach(function(fid) {
     const el = document.getElementById(fid);
     if (el && !el.value) el.value = hoyISO();
   });
@@ -458,6 +461,16 @@ function llenarSelectAnimales() {
   db.animales
     .filter(function(a) { return a.estado === 'activo'; })
     .forEach(function(a) { sel.innerHTML += '<option value="' + a.id + '">' + (a.tipo === 'bovino' ? '🐄' : '🐎') + ' ' + a.nombre + '</option>'; });
+}
+
+function llenarSelectAnimalesCarne() {
+  const sel = document.getElementById('p-animal');
+  sel.innerHTML = '<option value="">Seleccionar animal...</option>';
+  db.animales
+    .filter(function(a) { return a.estado === 'activo'; })
+    .forEach(function(a) {
+      sel.innerHTML += '<option value="' + a.id + '">' + (a.tipo === 'bovino' ? '🐄' : '🐎') + ' ' + a.nombre + ' (' + a.id + ')</option>';
+    });
 }
 
 // ============================================================
@@ -547,6 +560,7 @@ function eliminarAnimal(id) {
   db.leche        = db.leche.filter(function(r) { return r.animalId !== id; });
   db.reproductivo = db.reproductivo.filter(function(r) { return r.animalId !== id; });
   db.salud        = db.salud.filter(function(r) { return r.animalId !== id; });
+  db.carne        = db.carne.filter(function(r) { return r.animalId !== id; });
   guardarDB();
   renderTablaAnimales(); renderDashboard(); renderInventario();
 }
@@ -559,13 +573,16 @@ function eliminarCompleto(id) {
   db.leche        = db.leche.filter(function(r) { return r.animalId !== id; });
   db.reproductivo = db.reproductivo.filter(function(r) { return r.animalId !== id; });
   db.salud        = db.salud.filter(function(r) { return r.animalId !== id; });
+  db.carne        = db.carne.filter(function(r) { return r.animalId !== id; });
   guardarDB();
-  renderTablaAnimales(); renderDashboard(); renderLeche(); renderReproduccion(); renderSalud(); renderInventario();
+  renderTablaAnimales(); renderDashboard(); renderLeche(); renderReproduccion(); renderSalud(); renderInventario(); renderCarne();
 }
 
 // ============================================================
-// GUARDAR DATOS — MÓDULOS
+// GUARDAR DATOS — MÓDULOS (con eliminación)
 // ============================================================
+
+// — LECHE —
 function guardarLeche() {
   const animalId = document.getElementById('l-vaca').value;
   const fecha    = document.getElementById('l-fecha').value;
@@ -579,6 +596,15 @@ function guardarLeche() {
   document.getElementById('l-nota').value   = '';
 }
 
+function eliminarLeche(id) {
+  if (!confirm('¿Eliminar este registro de leche?')) return;
+  db.leche = db.leche.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderLeche();
+  renderDashboard();
+}
+
+// — REPRODUCCIÓN —
 function calcularFechaParto(fecha, tipo) {
   if (!fecha || !tipo) return null;
   const d = new Date(fecha);
@@ -617,6 +643,15 @@ function guardarRepro() {
   if (fechaParto) alert('✅ Gestación registrada\n🗓️ Parto estimado: ' + fmt(fechaParto));
 }
 
+function eliminarRepro(id) {
+  if (!confirm('¿Eliminar este evento reproductivo?')) return;
+  db.reproductivo = db.reproductivo.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderReproduccion();
+  renderDashboard();
+}
+
+// — SALUD —
 function guardarSalud() {
   const animalId = document.getElementById('s-animal').value;
   const fecha    = document.getElementById('s-fecha').value;
@@ -639,6 +674,15 @@ function guardarSalud() {
   });
 }
 
+function eliminarSalud(id) {
+  if (!confirm('¿Eliminar este registro médico?')) return;
+  db.salud = db.salud.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderSalud();
+  renderDashboard();
+}
+
+// — ALIMENTACIÓN —
 function guardarAlimento() {
   const cantidad = document.getElementById('al-cantidad').value;
   const kg       = document.getElementById('al-kg').value;
@@ -658,6 +702,14 @@ function guardarAlimento() {
   renderAlimentacion();
 }
 
+function eliminarAlimento(id) {
+  if (!confirm('¿Eliminar este registro de alimento?')) return;
+  db.alimentacion = db.alimentacion.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderAlimentacion();
+}
+
+// — FINANZAS —
 function guardarGasto() {
   const valor = document.getElementById('g-valor').value;
   const desc  = document.getElementById('g-desc').value.trim();
@@ -686,6 +738,50 @@ function guardarVenta() {
   cerrarModal('modal-venta');
   renderFinanzas();
   ['v-valor','v-desc','v-cliente'].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function eliminarFinanza(id) {
+  if (!confirm('¿Eliminar esta transacción?')) return;
+  db.finanzas = db.finanzas.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderFinanzas();
+}
+
+// ============================================================
+// MÓDULO PRODUCCIÓN DE CARNE
+// ============================================================
+function guardarPesaje() {
+  const animalId = document.getElementById('p-animal').value;
+  const fecha    = document.getElementById('p-fecha').value;
+  const peso     = document.getElementById('p-peso').value;
+  if (!animalId || !fecha || !peso) { alert('⚠️ Completa animal, fecha y peso'); return; }
+
+  const pesoN = Number(peso);
+
+  // Actualizar peso actual del animal también
+  const animal = db.animales.find(function(a) { return a.id === animalId; });
+  if (animal) animal.peso = pesoN;
+
+  db.carne.push({
+    id:         nuevoId('C'),
+    animalId,
+    fecha,
+    peso:       pesoN,
+    destino:    document.getElementById('p-destino').value,
+    precioKg:   Number(document.getElementById('p-precio').value) || 0,
+    obs:        document.getElementById('p-obs').value,
+  });
+  guardarDB();
+  cerrarModal('modal-pesaje');
+  renderCarne();
+  ['p-peso','p-precio','p-obs'].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function eliminarPesaje(id) {
+  if (!confirm('¿Eliminar este registro de pesaje?')) return;
+  db.carne = db.carne.filter(function(r) { return r.id !== id; });
+  guardarDB();
+  renderCarne();
 }
 
 // ============================================================
@@ -836,9 +932,16 @@ function verFicha(id) {
   const saludA  = db.salud.filter(function(s) { return s.animalId === id; });
   const reproA  = db.reproductivo.filter(function(r) { return r.animalId === id; });
   const lecheA  = db.leche.filter(function(l) { return l.animalId === id; });
+  const carneA  = db.carne.filter(function(c) { return c.animalId === id; }).sort(function(x,y){ return x.fecha > y.fecha ? 1 : -1; });
   const tipoIcon = { vacuna: '💉', desparasitacion: '🪱', herraje: '🔩', odontologia: '🦷', vitamina: '💊', otro: '🏥' };
   const totalL  = lecheA.reduce(function(s, l) { return s + l.litros; }, 0);
   const promL   = lecheA.length > 0 ? (totalL / lecheA.length).toFixed(1) : '-';
+
+  // Calcular ganancia de peso total desde carne
+  let gananciaTotal = '-';
+  if (carneA.length >= 2) {
+    gananciaTotal = (carneA[carneA.length-1].peso - carneA[0].peso).toFixed(1) + ' kg';
+  }
 
   const madre = a.madre ? db.animales.find(function(x) { return x.id === a.madre; }) : null;
   const padre = a.padre ? db.animales.find(function(x) { return x.id === a.padre; }) : null;
@@ -883,6 +986,14 @@ function verFicha(id) {
     (a.tipo === 'bovino' && a.sexo === 'hembra' ?
       '<div style="margin-top:1rem"><p style="font-size:0.78rem;font-weight:700;color:var(--gris-texto);margin-bottom:6px">🥛 PRODUCCIÓN DE LECHE</p>' +
       '<p style="font-size:0.85rem">Registros: <strong>' + lecheA.length + '</strong> · Total: <strong>' + totalL.toFixed(1) + ' L</strong> · Prom: <strong>' + promL + ' L/día</strong></p></div>' : '') +
+    (carneA.length > 0 ?
+      '<div style="margin-top:1rem"><p style="font-size:0.78rem;font-weight:700;color:var(--gris-texto);margin-bottom:6px">🥩 HISTORIAL DE PESAJES (' + carneA.length + ' registros)</p>' +
+      '<p style="font-size:0.82rem;margin-bottom:6px">Ganancia total: <strong style="color:var(--verde-medio)">' + gananciaTotal + '</strong></p>' +
+      carneA.map(function(c) {
+        return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gris-borde);font-size:0.82rem">' +
+          '<span><strong>' + c.peso + ' kg</strong>' + (c.destino !== 'seguimiento' ? ' · <span class="badge badge-tierra">' + c.destino + '</span>' : '') + (c.precioKg ? ' · ' + moneda(c.precioKg) + '/kg' : '') + '</span>' +
+          '<span style="color:var(--gris-texto)">' + fmt(c.fecha) + '</span></div>';
+      }).join('') + '</div>' : '') +
     (reproA.length > 0 ?
       '<div style="margin-top:1rem"><p style="font-size:0.78rem;font-weight:700;color:var(--gris-texto);margin-bottom:6px">🔁 HISTORIAL REPRODUCTIVO</p>' +
       reproA.map(function(r) {
@@ -915,11 +1026,17 @@ function renderLeche() {
       '<span style="font-size:0.85rem;font-weight:700;color:var(--verde-medio);width:70px;text-align:right">' + prom.toFixed(1) + ' L/día</span>' +
       '</div>';
   }).join('') || '<p style="color:var(--gris-texto);font-size:0.85rem">Agrega vacas lecheras en "Mis animales"</p>';
-  document.getElementById('tbody-leche').innerHTML = db.leche.slice().reverse().slice(0, 30).map(function(l) {
+  document.getElementById('tbody-leche').innerHTML = db.leche.slice().reverse().slice(0, 50).map(function(l) {
     const a = db.animales.find(function(x) { return x.id === l.animalId; });
     if (!a || a.estado === 'muerto') return '';
-    return '<tr><td>' + fmt(l.fecha) + '</td><td><strong>' + ((a && a.nombre) || l.animalId) + '</strong></td><td><strong style="color:var(--verde-medio)">' + l.litros.toFixed(1) + ' L</strong></td><td style="color:var(--gris-texto)">' + (l.nota || '-') + '</td></tr>';
-  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+    return '<tr>' +
+      '<td>' + fmt(l.fecha) + '</td>' +
+      '<td><strong>' + ((a && a.nombre) || l.animalId) + '</strong></td>' +
+      '<td><strong style="color:var(--verde-medio)">' + l.litros.toFixed(1) + ' L</strong></td>' +
+      '<td style="color:var(--gris-texto)">' + (l.nota || '-') + '</td>' +
+      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarLeche(\'' + l.id + '\')">🗑️</button></td>' +
+      '</tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
 }
 
 // ============================================================
@@ -944,8 +1061,9 @@ function renderReproduccion() {
         '</select></td>' +
         '<td>' + fmt(r.fechaParto) + '</td>' +
         '<td>' + (d !== null ? '<span class="badge ' + (d <= 30 ? 'badge-amarillo' : 'badge-azul') + '">' + (d > 0 ? d + 'd' : '¡Inminente!') + '</span>' : '-') + '</td>' +
+        '<td><button class="btn btn-sm btn-rojo" onclick="eliminarRepro(\'' + r.id + '\')">🗑️</button></td>' +
         '</tr>';
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin eventos reproductivos</td></tr>';
+    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin eventos reproductivos</td></tr>';
 }
 
 // ============================================================
@@ -979,8 +1097,9 @@ function renderSalud() {
         '<td>' + fmt(s.fecha) + '</td>' +
         '<td>' + (s.proxima ? '<span class="badge ' + (diasPara(s.proxima) <= 7 ? 'badge-rojo' : 'badge-amarillo') + '">' + fmt(s.proxima) + '</span>' : '-') + '</td>' +
         '<td>' + (s.veterinario || '-') + '</td>' +
+        '<td><button class="btn btn-sm btn-rojo" onclick="eliminarSalud(\'' + s.id + '\')">🗑️</button></td>' +
         '</tr>';
-    }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
 }
 
 // ============================================================
@@ -1016,8 +1135,10 @@ function renderAlimentacion() {
     return '<tr>' +
       '<td><span class="badge ' + (a.tipo === 'heno' ? 'badge-verde' : 'badge-tierra') + '">' + (a.tipo === 'heno' ? '🌿 Heno' : '🌽 Concentrado') + '</span></td>' +
       '<td>' + fmt(a.fecha) + '</td><td>' + a.cantidad + '</td><td>' + a.kg + ' kg</td><td>' + a.consumoDiario + ' kg/día</td>' +
-      '<td><strong>' + dias + ' días</strong></td><td style="color:var(--gris-texto)">' + (a.notas || '-') + '</td></tr>';
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+      '<td><strong>' + dias + ' días</strong></td><td style="color:var(--gris-texto)">' + (a.notas || '-') + '</td>' +
+      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarAlimento(\'' + a.id + '\')">🗑️</button></td>' +
+      '</tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
 }
 
 // ============================================================
@@ -1048,12 +1169,125 @@ function renderFinanzas() {
         (f.tipo === 'ingreso' ? '+' : '−') + moneda(f.valor) + '</strong></div>';
   }).join('') || '<p style="color:var(--gris-texto);font-size:0.85rem">Sin transacciones</p>';
   document.getElementById('tbody-finanzas').innerHTML = db.finanzas.slice().sort(function(a, b) { return b.fecha < a.fecha ? -1 : 1; }).map(function(f) {
-    return '<tr><td>' + fmt(f.fecha) + '</td>' +
+    return '<tr>' +
+      '<td>' + fmt(f.fecha) + '</td>' +
       '<td><span class="badge ' + (f.tipo === 'ingreso' ? 'badge-verde' : 'badge-rojo') + '">' + (f.tipo === 'ingreso' ? '📈 Ingreso' : '📉 Gasto') + '</span></td>' +
       '<td><span class="badge badge-gris">' + (cats[f.cat] || f.cat) + '</span></td>' +
       '<td>' + f.desc + (f.extra ? '<small style="color:var(--gris-texto)"> · ' + f.extra + '</small>' : '') + '</td>' +
-      '<td><strong style="color:' + (f.tipo === 'ingreso' ? 'var(--verde-medio)' : 'var(--rojo)') + '">' + (f.tipo === 'ingreso' ? '+' : '−') + moneda(f.valor) + '</strong></td></tr>';
-  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+      '<td><strong style="color:' + (f.tipo === 'ingreso' ? 'var(--verde-medio)' : 'var(--rojo)') + '">' + (f.tipo === 'ingreso' ? '+' : '−') + moneda(f.valor) + '</strong></td>' +
+      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarFinanza(\'' + f.id + '\')">🗑️</button></td>' +
+      '</tr>';
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+}
+
+// ============================================================
+// RENDER — PRODUCCIÓN DE CARNE
+// ============================================================
+function renderCarne() {
+  try {
+    const activos = db.animales.filter(function(a) { return a.estado === 'activo'; });
+    const pesajes = db.carne;
+
+    // Stats globales
+    const totalPesajes = pesajes.length;
+    const animalesConPesaje = deduplicar(pesajes.map(function(p) { return p.animalId; })).length;
+
+    // Calcular ganancia de peso promedio (animales con 2+ pesajes)
+    let gananciasArr = [];
+    activos.forEach(function(a) {
+      const ps = pesajes.filter(function(p) { return p.animalId === a.id; }).sort(function(x,y){ return x.fecha > y.fecha ? 1 : -1; });
+      if (ps.length >= 2) {
+        const diasDiff = Math.max(1, (new Date(ps[ps.length-1].fecha) - new Date(ps[0].fecha)) / 86400000);
+        const ganKgDia = (ps[ps.length-1].peso - ps[0].peso) / diasDiff;
+        gananciasArr.push(ganKgDia);
+      }
+    });
+    const promGanancia = gananciasArr.length > 0
+      ? (gananciasArr.reduce(function(s,v){ return s+v; }, 0) / gananciasArr.length).toFixed(2)
+      : '-';
+
+    // Valor estimado total (último precio/kg por animal)
+    let valorEstimado = 0;
+    activos.forEach(function(a) {
+      const ps = pesajes.filter(function(p) { return p.animalId === a.id && p.precioKg > 0; }).sort(function(x,y){ return x.fecha > y.fecha ? 1 : -1; });
+      if (ps.length > 0) {
+        valorEstimado += a.peso * ps[0].precioKg;
+      }
+    });
+
+    document.getElementById('stats-carne').innerHTML =
+      '<div class="stat-card"><div class="stat-label">Pesajes registrados<span>⚖️</span></div><div class="stat-value" style="color:var(--tierra)">' + totalPesajes + '</div><div class="stat-sub">en ' + animalesConPesaje + ' animales</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Ganancia diaria prom.<span>📈</span></div><div class="stat-value" style="color:var(--verde-medio);font-size:1.4rem">' + (promGanancia !== '-' ? promGanancia + ' kg' : '-') + '</div><div class="stat-sub">kg/día/animal</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Valor estimado hato<span>💰</span></div><div class="stat-value" style="color:var(--azul);font-size:1.1rem">' + (valorEstimado > 0 ? moneda(valorEstimado) : '-') + '</div><div class="stat-sub">según último precio</div></div>';
+
+    // Tabla por animal con curva de peso
+    const panelAnimales = document.getElementById('carne-animales');
+    const animalesConDatos = activos.filter(function(a) {
+      return pesajes.some(function(p) { return p.animalId === a.id; });
+    });
+
+    if (animalesConDatos.length === 0) {
+      panelAnimales.innerHTML = '<p style="color:var(--gris-texto);font-size:0.85rem">Registra el primer pesaje con el botón "+ Registrar pesaje".</p>';
+    } else {
+      panelAnimales.innerHTML = animalesConDatos.map(function(a) {
+        const ps = pesajes.filter(function(p) { return p.animalId === a.id; }).sort(function(x,y){ return x.fecha > y.fecha ? 1 : -1; });
+        const ultimo  = ps[0];
+        const primero = ps[ps.length - 1];
+        const ganTotal = ps.length >= 2 ? (primero.peso - ps[ps.length-1].peso) : null; // Nota: ps ya ordenado desc, así que calculamos bien:
+        const psPorFecha = pesajes.filter(function(p) { return p.animalId === a.id; }).sort(function(x,y){ return x.fecha > y.fecha ? -1 : 1; });
+        const ganTotalReal = psPorFecha.length >= 2 ? (psPorFecha[psPorFecha.length-1].peso - psPorFecha[0].peso).toFixed(1) : null;
+        const diasTotales  = psPorFecha.length >= 2 ? Math.max(1, (new Date(psPorFecha[psPorFecha.length-1].fecha) - new Date(psPorFecha[0].fecha)) / 86400000) : null;
+        const ganDiaria    = diasTotales ? (ganTotalReal / diasTotales).toFixed(2) : null;
+
+        // Mini gráfico de barras de peso
+        const pesos = psPorFecha.map(function(p){ return p.peso; });
+        const maxP  = pesos.length > 0 ? Math.max.apply(null, pesos) : 1;
+        const miniBarras = psPorFecha.slice(-5).map(function(p) {
+          return '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:1">' +
+            '<span style="font-size:0.58rem;color:var(--gris-texto)">' + p.peso + '</span>' +
+            '<div style="width:100%;background:var(--tierra);border-radius:3px 3px 0 0;height:' + Math.round((p.peso/maxP)*36) + 'px;min-height:3px;opacity:0.75"></div>' +
+            '<span style="font-size:0.55rem;color:var(--gris-texto)">' + p.fecha.slice(5) + '</span>' +
+            '</div>';
+        }).join('');
+
+        const precioEstimado = ultimo && ultimo.precioKg > 0 ? moneda(a.peso * ultimo.precioKg) : null;
+
+        return '<div style="padding:14px 0;border-bottom:1px solid var(--gris-borde)">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
+            '<div>' +
+              '<strong style="font-size:0.92rem">' + (a.tipo === 'bovino' ? '🐄' : '🐎') + ' ' + a.nombre + '</strong>' +
+              ' <code style="font-size:0.72rem;color:var(--gris-texto)">' + a.id + '</code>' +
+              '<div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">' +
+                '<span class="badge badge-tierra">⚖️ ' + a.peso + ' kg actual</span>' +
+                (ganTotalReal !== null ? '<span class="badge badge-verde">+' + ganTotalReal + ' kg total</span>' : '') +
+                (ganDiaria !== null ? '<span class="badge badge-azul">+' + ganDiaria + ' kg/día</span>' : '') +
+                (precioEstimado ? '<span class="badge badge-amarillo">Est. ' + precioEstimado + '</span>' : '') +
+              '</div>' +
+            '</div>' +
+            '<span style="font-size:0.75rem;color:var(--gris-texto)">' + ps.length + ' pesajes</span>' +
+          '</div>' +
+          (psPorFecha.length > 0 ? '<div style="display:flex;align-items:flex-end;gap:4px;height:50px;margin-bottom:2px">' + miniBarras + '</div>' : '') +
+        '</div>';
+      }).join('');
+    }
+
+    // Tabla historial de pesajes
+    document.getElementById('tbody-carne').innerHTML = pesajes.slice().sort(function(a,b){ return b.fecha > a.fecha ? 1 : -1; }).map(function(p) {
+      const a = db.animales.find(function(x) { return x.id === p.animalId; });
+      const destLabel = { seguimiento: '📊 Seguimiento', venta: '💵 Venta', faena: '🔪 Faena', subasta: '🏷️ Subasta' };
+      return '<tr>' +
+        '<td>' + fmt(p.fecha) + '</td>' +
+        '<td><strong>' + ((a && a.nombre) || p.animalId) + '</strong></td>' +
+        '<td><strong style="color:var(--tierra)">' + p.peso + ' kg</strong></td>' +
+        '<td>' + (p.precioKg > 0 ? moneda(p.precioKg) + '/kg' : '-') + '</td>' +
+        '<td>' + (p.precioKg > 0 ? '<strong>' + moneda(p.peso * p.precioKg) + '</strong>' : '-') + '</td>' +
+        '<td><span class="badge badge-gris">' + (destLabel[p.destino] || p.destino) + '</span></td>' +
+        '<td style="color:var(--gris-texto);font-size:0.8rem">' + (p.obs || '-') + '</td>' +
+        '<td><button class="btn btn-sm btn-rojo" onclick="eliminarPesaje(\'' + p.id + '\')">🗑️</button></td>' +
+        '</tr>';
+    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin pesajes registrados</td></tr>';
+
+  } catch(e) { console.error('renderCarne:', e); }
 }
 
 // ============================================================
