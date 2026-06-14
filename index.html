@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 
 <!-- Estilos -->
 <link rel="stylesheet" href="styles.css">
@@ -366,23 +367,18 @@
     <!-- ALIMENTACIÓN -->
     <div class="page" id="page-alimentacion">
       <div class="section-title">
-        <div><h2>🌾 Alimentación</h2><p>Control de heno y concentrado</p></div>
-        <button class="btn btn-verde" onclick="abrirModal('modal-alimento')">+ Registrar alimento</button>
+        <div><h2>🌾 Alimentación</h2><p>Control de alimentos, sales, aceites y suplementos</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-alimento')">+ Registrar alimento / insumo</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:1.2rem">
-        <div class="card">
-          <div class="card-header" style="border-left:4px solid var(--verde-claro)"><h3>🌿 Heno</h3></div>
-          <div class="card-body" id="resumen-heno"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
-        </div>
-        <div class="card">
-          <div class="card-header" style="border-left:4px solid var(--tierra)"><h3>🌽 Concentrado</h3></div>
-          <div class="card-body" id="resumen-concentrado"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
-        </div>
+      <div class="stats-grid" id="stats-alimentacion" style="margin-bottom:1.2rem"></div>
+      <div class="card">
+        <div class="card-header"><h3>Resumen por producto (último registro)</h3></div>
+        <div class="card-body" id="resumen-alimentos"><p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p></div>
       </div>
       <div class="card">
         <div class="card-header"><h3>Historial de compras</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Tipo</th><th>Fecha</th><th>Cantidad</th><th>Kg/unidad</th><th>Consumo/día</th><th>Duración est.</th><th>Notas</th><th>Acción</th></tr></thead>
+          <table><thead><tr><th>Producto</th><th>Categoría</th><th>Fecha</th><th>Cantidad</th><th>Consumo/día</th><th>Duración est.</th><th>Costo</th><th>Notas</th><th>Acción</th></tr></thead>
           <tbody id="tbody-alimento"></tbody></table>
         </div>
       </div>
@@ -434,10 +430,20 @@
         </div>
       </div>
       <div class="card" style="margin-top:1.2rem">
-        <div class="card-header"><h3>Inventario completo</h3></div>
+        <div class="card-header"><h3>Inventario completo de animales</h3></div>
         <div class="tabla-wrap">
           <table><thead><tr><th>ID</th><th>Tipo</th><th>Nombre</th><th>Sexo</th><th>Raza</th><th>Edad</th><th>Peso</th><th>Estado</th></tr></thead>
           <tbody id="tbody-inventario"></tbody></table>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.2rem;border-left:4px solid var(--azul)">
+        <div class="card-header"><h3>💊 Inventario de medicamentos</h3>
+          <button class="btn btn-sm btn-verde" onclick="abrirModal('modal-medicamento')">+ Agregar medicamento</button>
+        </div>
+        <div class="card-body" id="alertas-medicamentos"></div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Medicamento</th><th>Cantidad disponible</th><th>Vencimiento</th><th>Notas</th><th>Acción</th></tr></thead>
+          <tbody id="tbody-medicamentos"></tbody></table>
         </div>
       </div>
     </div>
@@ -472,6 +478,18 @@
     <div class="modal-header"><h3>🐄 Agregar animal</h3><button class="modal-close" onclick="cerrarModal('modal-animal')">×</button></div>
     <div class="modal-body">
       <div class="form-grid">
+        <div class="form-group form-full" style="align-items:center">
+          <label>Foto del animal</label>
+          <div style="display:flex;align-items:center;gap:14px">
+            <img id="a-foto-preview" src="" alt="" style="width:84px;height:84px;border-radius:12px;object-fit:cover;background:var(--crema);border:1px solid var(--gris-borde);display:none">
+            <div id="a-foto-vacio" style="width:84px;height:84px;border-radius:12px;background:var(--crema);border:1px solid var(--gris-borde);display:flex;align-items:center;justify-content:center;font-size:2rem;color:var(--gris-texto)">📷</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <input type="file" id="a-foto-input" accept="image/*" onchange="cargarFotoAnimal(this)" style="font-size:0.78rem">
+              <button type="button" class="btn btn-sm btn-outline" style="align-self:flex-start" onclick="quitarFotoAnimal()">🗑️ Quitar foto</button>
+              <small style="color:var(--gris-texto);font-size:0.7rem">Se puede actualizar la foto cuando el animal va creciendo</small>
+            </div>
+          </div>
+        </div>
         <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="a-tipo"><option value="bovino">🐄 Bovino</option><option value="equino">🐎 Equino</option></select></div>
         <div class="form-group"><label>Nombre <span class="req">*</span></label><input type="text" id="a-nombre" placeholder="Ej: Valentina"></div>
         <div class="form-group"><label>Sexo <span class="req">*</span></label><select id="a-sexo"><option value="hembra">Hembra</option><option value="macho">Macho</option></select></div>
@@ -480,6 +498,8 @@
         <div class="form-group"><label>Peso actual (kg) <span class="req">*</span></label><input type="number" id="a-peso" placeholder="Ej: 450"></div>
         <div class="form-group"><label>Procedencia</label><select id="a-procedencia"><option value="nacido">Nacido en finca</option><option value="comprado">Comprado</option><option value="importado">Importado</option></select></div>
         <div class="form-group"><label>Estado</label><select id="a-estado"><option value="activo">Activo</option><option value="vendido">Vendido</option><option value="muerto">Muerto / Baja</option></select></div>
+        <div class="form-group"><label>Potrero / Ubicación actual</label><input type="text" id="a-potrero" placeholder="Ej: Potrero 3"></div>
+        <div class="form-group"><label>Desde cuándo está ahí</label><input type="date" id="a-potrero-fecha"></div>
         <div class="form-group"><label>ID Madre (opcional)</label><input type="text" id="a-madre" placeholder="Ej: BOV-001"></div>
         <div class="form-group"><label>ID Padre (opcional)</label><input type="text" id="a-padre" placeholder="Ej: BOV-003"></div>
         <div class="form-group form-full"><label>Notas</label><textarea id="a-notas" rows="2"></textarea></div>
@@ -495,7 +515,12 @@
 <!-- Modal: Ficha del animal -->
 <div class="modal-overlay" id="modal-ficha">
   <div class="modal" style="max-width:600px">
-    <div class="modal-header"><h3>📋 Ficha del animal</h3><button class="modal-close" onclick="cerrarModal('modal-ficha')">×</button></div>
+    <div class="modal-header"><h3>📋 Ficha del animal</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-sm btn-tierra" id="btn-descargar-ficha" onclick="descargarFichaWord()">⬇️ Word</button>
+        <button class="modal-close" onclick="cerrarModal('modal-ficha')">×</button>
+      </div>
+    </div>
     <div class="modal-body" id="ficha-contenido"></div>
   </div>
 </div>
@@ -581,8 +606,12 @@
         <div class="form-group"><label>Tipo</label><select id="s-tipo"><option value="vacuna">💉 Vacuna</option><option value="desparasitacion">🪱 Desparasitación</option><option value="herraje">🔩 Herraje</option><option value="odontologia">🦷 Odontología</option><option value="vitamina">💊 Vitaminas</option><option value="otro">🏥 Otro</option></select></div>
         <div class="form-group"><label>Fecha del evento <span class="req">*</span></label><input type="date" id="s-fecha"></div>
         <div class="form-group"><label>Próxima fecha (para alerta)</label><input type="date" id="s-proxima"></div>
-        <div class="form-group"><label>Medicamento</label><input type="text" id="s-medicamento"></div>
+        <div class="form-group"><label>Medicamento (del inventario)</label>
+          <select id="s-medicamento-inv" onchange="seleccionarMedicamentoSalud(this.value)"><option value="">— Ninguno / escribir manualmente —</option></select>
+        </div>
+        <div class="form-group"><label>Medicamento (nombre)</label><input type="text" id="s-medicamento"></div>
         <div class="form-group"><label>Dosis</label><input type="text" id="s-dosis" placeholder="Ej: 5ml"></div>
+        <div class="form-group"><label>Cantidad usada del inventario</label><input type="number" step="0.01" id="s-cantidad-usada" placeholder="Ej: 5"></div>
         <div class="form-group form-full"><label>Descripción</label><input type="text" id="s-desc"></div>
         <div class="form-group form-full"><label>Veterinario</label><input type="text" id="s-vet"></div>
         <div class="form-actions">
@@ -594,19 +623,70 @@
   </div>
 </div>
 
+<!-- Modal: Medicamento (inventario) -->
+<div class="modal-overlay" id="modal-medicamento">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header"><h3>💊 Agregar medicamento al inventario</h3><button class="modal-close" onclick="cerrarModal('modal-medicamento')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label>Nombre del medicamento <span class="req">*</span></label><input type="text" id="m-nombre" placeholder="Ej: Ivermectina 1%"></div>
+        <div class="form-group"><label>Cantidad disponible <span class="req">*</span></label><input type="number" step="0.01" id="m-cantidad" placeholder="Ej: 500"></div>
+        <div class="form-group"><label>Unidad</label>
+          <select id="m-unidad">
+            <option value="ml">ml</option>
+            <option value="L">litros</option>
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+            <option value="unidad">unidades / dosis</option>
+            <option value="frasco">frascos</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="m-vencimiento"></div>
+        <div class="form-group form-full"><label>Notas</label><input type="text" id="m-notas" placeholder="Proveedor, lote, etc."></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-medicamento')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarMedicamento()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Alimento -->
 <div class="modal-overlay" id="modal-alimento">
   <div class="modal" style="max-width:560px">
-    <div class="modal-header"><h3>🌾 Registrar alimento</h3><button class="modal-close" onclick="cerrarModal('modal-alimento')">×</button></div>
+    <div class="modal-header"><h3>🌾 Registrar alimento / insumo</h3><button class="modal-close" onclick="cerrarModal('modal-alimento')">×</button></div>
     <div class="modal-body">
       <div class="form-grid">
-        <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="al-tipo"><option value="heno">🌿 Heno</option><option value="concentrado">🌽 Concentrado</option></select></div>
+        <div class="form-group form-full"><label>Producto <span class="req">*</span></label>
+          <input type="text" id="al-producto" placeholder="Ej: Heno, Concentrado, Sal mineralizada, Aceite, Suplemento vitamínico...">
+        </div>
+        <div class="form-group"><label>Categoría</label>
+          <select id="al-categoria">
+            <option value="forraje">🌿 Forraje / Heno</option>
+            <option value="concentrado">🌽 Concentrado</option>
+            <option value="sal">🧂 Sal / Minerales</option>
+            <option value="aceite">🛢️ Aceite</option>
+            <option value="suplemento">💊 Suplemento</option>
+            <option value="otro">📦 Otro</option>
+          </select>
+        </div>
         <div class="form-group"><label>Fecha de compra <span class="req">*</span></label><input type="date" id="al-fecha"></div>
-        <div class="form-group"><label>Cantidad (pacas/costales) <span class="req">*</span></label><input type="number" id="al-cantidad"></div>
-        <div class="form-group"><label>Kg por unidad <span class="req">*</span></label><input type="number" step="0.1" id="al-kg"></div>
-        <div class="form-group"><label>Consumo diario total (kg)</label><input type="number" step="0.1" id="al-consumo"></div>
+        <div class="form-group"><label>Cantidad (unidades) <span class="req">*</span></label><input type="number" step="0.01" id="al-cantidad"></div>
+        <div class="form-group"><label>Unidad de medida</label>
+          <select id="al-unidad">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="L">litros</option>
+            <option value="ml">ml</option>
+            <option value="bulto">bultos / pacas</option>
+            <option value="unidad">unidades</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Cantidad por unidad (kg/L, si aplica)</label><input type="number" step="0.1" id="al-kg" placeholder="Ej: 40"></div>
+        <div class="form-group"><label>Consumo diario total</label><input type="number" step="0.1" id="al-consumo"></div>
         <div class="form-group"><label>Costo total (pesos)</label><input type="number" id="al-costo"></div>
-        <div class="form-group form-full"><label>Notas</label><input type="text" id="al-notas"></div>
+        <div class="form-group form-full"><label>Notas</label><input type="text" id="al-notas" placeholder="Ej: para terneros, marca, proveedor..."></div>
         <div class="form-actions">
           <button class="btn btn-outline" onclick="cerrarModal('modal-alimento')">Cancelar</button>
           <button class="btn btn-verde" onclick="guardarAlimento()">💾 Guardar</button>

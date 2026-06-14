@@ -15,13 +15,14 @@ let firestore      = null;
 let usuarioActual  = null;
 let db             = crearDBVacia();
 let idAnimalEnEdicion = null;
+let idFichaActual    = null;
 let syncTimeout    = null;
 let modoTab        = 'login';
 
 function crearDBVacia() {
   return {
     config: { nombre: 'Mi Finca', propietario: 'Administrador', lugar: '' },
-    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: []
+    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: []
   };
 }
 
@@ -36,7 +37,8 @@ function normalizarDB(datos) {
     salud:        Array.isArray(seguro.salud)        ? seguro.salud        : [],
     alimentacion: Array.isArray(seguro.alimentacion) ? seguro.alimentacion : [],
     finanzas:     Array.isArray(seguro.finanzas)     ? seguro.finanzas     : [],
-    carne:        Array.isArray(seguro.carne)        ? seguro.carne        : []
+    carne:        Array.isArray(seguro.carne)        ? seguro.carne        : [],
+    medicamentos: Array.isArray(seguro.medicamentos) ? seguro.medicamentos : []
   };
 }
 
@@ -217,7 +219,7 @@ function accionLogin() {
       .then(function(cred) {
         return firestore.collection('usuarios').doc(cred.user.uid).set({
           config: { nombre: finca, propietario: nombre, lugar: '' },
-          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [],
+          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [],
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
       })
@@ -419,11 +421,11 @@ function abrirModal(id) {
   if (id === 'modal-animal' && idAnimalEnEdicion === null) resetFormularioAnimal();
   if (id === 'modal-leche')  llenarSelectVacas();
   if (id === 'modal-repro')  llenarSelectHembras();
-  if (id === 'modal-salud')  llenarSelectAnimales();
+  if (id === 'modal-salud') { llenarSelectAnimales(); llenarSelectMedicamentos(); }
   if (id === 'modal-pesaje') llenarSelectAnimalesCarne();
-  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha'].forEach(function(fid) {
+  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha','m-vencimiento'].forEach(function(fid) {
     const el = document.getElementById(fid);
-    if (el && !el.value) el.value = hoyISO();
+    if (el && !el.value && fid !== 'm-vencimiento') el.value = hoyISO();
   });
   if (id === 'modal-config') {
     document.getElementById('config-nombre').value      = db.config.nombre;
@@ -473,6 +475,22 @@ function llenarSelectAnimalesCarne() {
     });
 }
 
+function llenarSelectMedicamentos() {
+  const sel = document.getElementById('s-medicamento-inv');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Ninguno / escribir manualmente —</option>';
+  db.medicamentos.forEach(function(m) {
+    sel.innerHTML += '<option value="' + m.id + '">' + m.nombre + ' (' + m.cantidad + ' ' + m.unidad + ' disponibles)</option>';
+  });
+}
+
+function seleccionarMedicamentoSalud(medId) {
+  if (!medId) return;
+  const m = db.medicamentos.find(function(x) { return x.id === medId; });
+  if (!m) return;
+  document.getElementById('s-medicamento').value = m.nombre;
+}
+
 // ============================================================
 // GUARDAR DATOS — CONFIGURACIÓN
 // ============================================================
@@ -493,13 +511,64 @@ function guardarConfig() {
 // ============================================================
 function resetFormularioAnimal() {
   idAnimalEnEdicion = null;
-  ['a-nombre','a-raza','a-nacimiento','a-peso','a-madre','a-padre','a-notas'].forEach(function(id) {
+  ['a-nombre','a-raza','a-nacimiento','a-peso','a-madre','a-padre','a-notas','a-potrero','a-potrero-fecha'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('a-tipo').value        = 'bovino';
   document.getElementById('a-sexo').value        = 'hembra';
   document.getElementById('a-procedencia').value = 'nacido';
   document.getElementById('a-estado').value      = 'activo';
+  document.getElementById('a-foto-input').value  = '';
+  fotoTemporal = null;
+  actualizarPreviewFoto(null);
+}
+
+// — FOTO DEL ANIMAL —
+let fotoTemporal = undefined; // undefined = sin cambios, null = quitar, string = nueva foto base64
+
+function actualizarPreviewFoto(src) {
+  const img   = document.getElementById('a-foto-preview');
+  const vacio = document.getElementById('a-foto-vacio');
+  if (src) {
+    img.src = src;
+    img.style.display   = 'block';
+    vacio.style.display = 'none';
+  } else {
+    img.src = '';
+    img.style.display   = 'none';
+    vacio.style.display = 'flex';
+  }
+}
+
+function cargarFotoAnimal(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { alert('⚠️ Selecciona un archivo de imagen'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    // Redimensionar/comprimir la imagen para no exceder el límite de Firestore
+    const img = new Image();
+    img.onload = function() {
+      const maxDim = 500;
+      let w = img.width, h = img.height;
+      if (w > h && w > maxDim)      { h = Math.round(h * maxDim / w); w = maxDim; }
+      else if (h > maxDim)          { w = Math.round(w * maxDim / h); h = maxDim; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      fotoTemporal = dataUrl;
+      actualizarPreviewFoto(dataUrl);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function quitarFotoAnimal() {
+  fotoTemporal = null;
+  document.getElementById('a-foto-input').value = '';
+  actualizarPreviewFoto(null);
 }
 
 function guardarAnimal() {
@@ -508,16 +577,31 @@ function guardarAnimal() {
   const peso   = document.getElementById('a-peso').value;
   if (!nombre || !nac || !peso) { alert('⚠️ Completa los campos obligatorios'); return; }
   const tipo   = document.getElementById('a-tipo').value;
+
+  // Determinar la foto: si hay una nueva, usarla; si se quitó, null; si no cambió, mantener la existente
+  let foto = null;
+  if (fotoTemporal === undefined) {
+    if (idAnimalEnEdicion) {
+      const existente = db.animales.find(function(a) { return a.id === idAnimalEnEdicion; });
+      foto = (existente && existente.foto) || null;
+    }
+  } else {
+    foto = fotoTemporal; // puede ser una nueva imagen o null si se quitó
+  }
+
   const animal = {
     id:          idAnimalEnEdicion || nuevoId(tipo === 'bovino' ? 'BOV' : 'EQU'),
     tipo,
     nombre,
+    foto,
     sexo:        document.getElementById('a-sexo').value,
     raza:        document.getElementById('a-raza').value,
     nacimiento:  nac,
     peso:        Number(peso),
     estado:      document.getElementById('a-estado').value,
     procedencia: document.getElementById('a-procedencia').value,
+    potrero:       document.getElementById('a-potrero').value.trim(),
+    potreroFecha:  document.getElementById('a-potrero-fecha').value,
     madre:       document.getElementById('a-madre').value,
     padre:       document.getElementById('a-padre').value,
     notas:       document.getElementById('a-notas').value,
@@ -547,9 +631,14 @@ function editarAnimal(id) {
   document.getElementById('a-peso').value        = a.peso;
   document.getElementById('a-procedencia').value = a.procedencia;
   document.getElementById('a-estado').value      = a.estado;
+  document.getElementById('a-potrero').value       = a.potrero || '';
+  document.getElementById('a-potrero-fecha').value = a.potreroFecha || '';
   document.getElementById('a-madre').value       = a.madre || '';
   document.getElementById('a-padre').value       = a.padre || '';
   document.getElementById('a-notas').value       = a.notas || '';
+  document.getElementById('a-foto-input').value  = '';
+  fotoTemporal = undefined;
+  actualizarPreviewFoto(a.foto || null);
   idAnimalEnEdicion = id;
   abrirModal('modal-animal');
 }
@@ -656,11 +745,28 @@ function guardarSalud() {
   const animalId = document.getElementById('s-animal').value;
   const fecha    = document.getElementById('s-fecha').value;
   if (!animalId || !fecha) { alert('⚠️ Selecciona el animal y la fecha'); return; }
+  const medInvId     = document.getElementById('s-medicamento-inv').value;
+  const cantidadUsada = Number(document.getElementById('s-cantidad-usada').value) || 0;
+
+  if (medInvId && cantidadUsada > 0) {
+    const med = db.medicamentos.find(function(m) { return m.id === medInvId; });
+    if (med) {
+      if (cantidadUsada > med.cantidad) {
+        if (!confirm('⚠️ Solo quedan ' + med.cantidad + ' ' + med.unidad + ' de "' + med.nombre + '". ¿Continuar y dejar el inventario en 0?')) return;
+        med.cantidad = 0;
+      } else {
+        med.cantidad = Math.round((med.cantidad - cantidadUsada) * 100) / 100;
+      }
+    }
+  }
+
   db.salud.push({
     id: nuevoId('S'), animalId,
     tipo:        document.getElementById('s-tipo').value,
     desc:        document.getElementById('s-desc').value,
     medicamento: document.getElementById('s-medicamento').value,
+    medicamentoInvId: medInvId || null,
+    cantidadUsada: cantidadUsada,
     dosis:       document.getElementById('s-dosis').value,
     fecha,
     proxima:     document.getElementById('s-proxima').value,
@@ -669,9 +775,11 @@ function guardarSalud() {
   guardarDB();
   cerrarModal('modal-salud');
   renderSalud();
-  ['s-desc','s-medicamento','s-dosis','s-proxima','s-vet'].forEach(function(id) {
+  renderInventario();
+  ['s-desc','s-medicamento','s-dosis','s-proxima','s-vet','s-cantidad-usada'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
+  document.getElementById('s-medicamento-inv').value = '';
 }
 
 function eliminarSalud(id) {
@@ -682,17 +790,57 @@ function eliminarSalud(id) {
   renderDashboard();
 }
 
+// — MEDICAMENTOS (INVENTARIO) —
+function guardarMedicamento() {
+  const nombre   = document.getElementById('m-nombre').value.trim();
+  const cantidad = document.getElementById('m-cantidad').value;
+  if (!nombre || !cantidad) { alert('⚠️ Completa nombre y cantidad'); return; }
+  db.medicamentos.push({
+    id: nuevoId('M'),
+    nombre,
+    cantidad:    Number(cantidad),
+    unidad:      document.getElementById('m-unidad').value,
+    vencimiento: document.getElementById('m-vencimiento').value,
+    notas:       document.getElementById('m-notas').value,
+  });
+  guardarDB();
+  cerrarModal('modal-medicamento');
+  renderInventario();
+  ['m-nombre','m-cantidad','m-vencimiento','m-notas'].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function editarMedicamento(id) {
+  const m = db.medicamentos.find(function(x) { return x.id === id; });
+  if (!m) return;
+  const nuevaCantidad = prompt('Nueva cantidad disponible de "' + m.nombre + '" (' + m.unidad + '):', m.cantidad);
+  if (nuevaCantidad === null) return;
+  const n = Number(nuevaCantidad);
+  if (isNaN(n) || n < 0) { alert('⚠️ Cantidad no válida'); return; }
+  m.cantidad = n;
+  guardarDB();
+  renderInventario();
+}
+
+function eliminarMedicamento(id) {
+  if (!confirm('¿Eliminar este medicamento del inventario?')) return;
+  db.medicamentos = db.medicamentos.filter(function(m) { return m.id !== id; });
+  guardarDB();
+  renderInventario();
+}
+
 // — ALIMENTACIÓN —
 function guardarAlimento() {
+  const producto = document.getElementById('al-producto').value.trim();
   const cantidad = document.getElementById('al-cantidad').value;
-  const kg       = document.getElementById('al-kg').value;
-  if (!cantidad || !kg) { alert('⚠️ Completa cantidad y kg'); return; }
+  if (!producto || !cantidad) { alert('⚠️ Completa producto y cantidad'); return; }
   db.alimentacion.push({
     id: nuevoId('A'),
-    tipo:          document.getElementById('al-tipo').value,
+    producto,
+    categoria:     document.getElementById('al-categoria').value,
     fecha:         document.getElementById('al-fecha').value,
     cantidad:      Number(cantidad),
-    kg:            Number(kg),
+    unidad:        document.getElementById('al-unidad').value,
+    kg:            Number(document.getElementById('al-kg').value) || 1,
     consumoDiario: Number(document.getElementById('al-consumo').value) || 0,
     costo:         Number(document.getElementById('al-costo').value) || 0,
     notas:         document.getElementById('al-notas').value,
@@ -700,6 +848,9 @@ function guardarAlimento() {
   guardarDB();
   cerrarModal('modal-alimento');
   renderAlimentacion();
+  ['al-producto','al-cantidad','al-kg','al-consumo','al-costo','al-notas'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
 }
 
 function eliminarAlimento(id) {
@@ -929,6 +1080,7 @@ function renderTablaAnimales() {
 function verFicha(id) {
   const a = db.animales.find(function(x) { return x.id === id; });
   if (!a) return;
+  idFichaActual = id;
   const saludA  = db.salud.filter(function(s) { return s.animalId === id; });
   const reproA  = db.reproductivo.filter(function(r) { return r.animalId === id; });
   const lecheA  = db.leche.filter(function(l) { return l.animalId === id; });
@@ -957,7 +1109,8 @@ function verFicha(id) {
 
   document.getElementById('ficha-contenido').innerHTML =
     '<div class="ficha-animal">' +
-      '<div class="ficha-emoji">' + (a.tipo === 'bovino' ? '🐄' : '🐎') + '</div>' +
+      (a.foto ? '<img src="' + a.foto + '" alt="' + a.nombre + '" style="width:64px;height:64px;border-radius:14px;object-fit:cover;border:1px solid var(--gris-borde)">' :
+        '<div class="ficha-emoji">' + (a.tipo === 'bovino' ? '🐄' : '🐎') + '</div>') +
       '<div>' +
         '<h2 style="font-size:1.3rem;font-family:\'Playfair Display\',serif;color:var(--verde-oscuro)">' + a.nombre + '</h2>' +
         '<p style="color:var(--gris-texto);font-size:0.82rem">ID: ' + a.id + ' · ' + (a.raza || 'Raza no especificada') + ' · ' + edad(a.nacimiento) + '</p>' +
@@ -972,6 +1125,8 @@ function verFicha(id) {
       '<div class="stat-card"><div class="stat-label">Nacimiento</div><div class="stat-value" style="font-size:1rem">' + fmt(a.nacimiento) + '</div></div>' +
       '<div class="stat-card"><div class="stat-label">Edad</div><div class="stat-value" style="font-size:1rem">' + edad(a.nacimiento) + '</div></div>' +
     '</div>' +
+    (a.potrero ? '<div class="ayuda" style="margin-bottom:1rem">📍 <strong>Ubicación:</strong> ' + a.potrero +
+      (a.potreroFecha ? ' · desde ' + fmt(a.potreroFecha) + (diasPara(a.potreroFecha) !== null ? ' (' + Math.abs(diasPara(a.potreroFecha)) + ' días)' : '') : '') + '</div>' : '') +
     (a.notas ? '<div class="ayuda" style="margin-bottom:1rem">📝 ' + a.notas + '</div>' : '') +
     genealogia +
     '<div style="margin-top:1rem">' +
@@ -1105,40 +1260,83 @@ function renderSalud() {
 // ============================================================
 // RENDER — ALIMENTACIÓN
 // ============================================================
+const CATS_ALIMENTO = {
+  forraje:     '🌿 Forraje / Heno',
+  concentrado: '🌽 Concentrado',
+  sal:         '🧂 Sal / Minerales',
+  aceite:      '🛢️ Aceite',
+  suplemento:  '💊 Suplemento',
+  otro:        '📦 Otro'
+};
+
 function renderAlimentacion() {
-  ['heno', 'concentrado'].forEach(function(tipo) {
-    const rs = db.alimentacion.filter(function(a) { return a.tipo === tipo; });
-    const ul = rs[rs.length - 1];
-    const id = tipo === 'heno' ? 'resumen-heno' : 'resumen-concentrado';
-    if (!ul) { document.getElementById(id).innerHTML = '<p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p>'; return; }
-    const totalKg = ul.cantidad * ul.kg;
-    const dias    = ul.consumoDiario > 0 ? Math.floor(totalKg / ul.consumoDiario) : 0;
-    const fa      = new Date(ul.fecha);
-    fa.setDate(fa.getDate() + dias);
-    const diasRes = diasPara(fa.toISOString().split('T')[0]);
-    document.getElementById(id).innerHTML =
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0.75rem">' +
-        '<div><p style="font-size:0.7rem;color:var(--gris-texto);font-weight:700;text-transform:uppercase">Cantidad</p>' +
-          '<p style="font-size:1.3rem;font-weight:700">' + ul.cantidad + ' unidades</p>' +
-          '<p style="font-size:0.78rem;color:var(--gris-texto)">' + totalKg.toFixed(0) + ' kg totales</p></div>' +
-        '<div><p style="font-size:0.7rem;color:var(--gris-texto);font-weight:700;text-transform:uppercase">Duración est.</p>' +
-          '<p style="font-size:1.3rem;font-weight:700;color:' + (diasRes !== null && diasRes < 14 ? 'var(--rojo)' : 'var(--verde-medio)') + '">' + dias + ' días</p>' +
-          '<p style="font-size:0.78rem;color:var(--gris-texto)">hasta ' + fmt(fa.toISOString().split('T')[0]) + '</p></div>' +
-      '</div>' +
-      '<div style="padding:8px 12px;background:var(--crema);border-radius:8px;font-size:0.8rem">' +
-        'Consumo diario: <strong>' + ul.consumoDiario + ' kg/día</strong>' + (ul.notas ? ' · ' + ul.notas : '') + (ul.costo ? ' · Costo: ' + moneda(ul.costo) : '') +
+  const regs = db.alimentacion;
+
+  // Stats generales
+  const totalCosto   = regs.reduce(function(s, a) { return s + (a.costo || 0); }, 0);
+  const productos    = deduplicar(regs.map(function(a) { return a.producto; }));
+  const conAlerta    = (function() {
+    let n = 0;
+    productos.forEach(function(p) {
+      const rs = regs.filter(function(a) { return a.producto === p; });
+      const ul = rs[rs.length - 1];
+      if (!ul) return;
+      const totalCant = ul.cantidad * (ul.kg || 1);
+      const dias      = ul.consumoDiario > 0 ? Math.floor(totalCant / ul.consumoDiario) : null;
+      if (dias !== null && dias < 14) n++;
+    });
+    return n;
+  })();
+  document.getElementById('stats-alimentacion').innerHTML =
+    '<div class="stat-card"><div class="stat-label">Productos registrados<span>🌾</span></div><div class="stat-value" style="color:var(--verde-medio)">' + productos.length + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Compras registradas<span>🧾</span></div><div class="stat-value" style="color:var(--azul)">' + regs.length + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Costo total<span>💰</span></div><div class="stat-value" style="color:var(--tierra);font-size:1.2rem">' + moneda(totalCosto) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-label">Por agotarse (&lt;14 días)<span>⚠️</span></div><div class="stat-value" style="color:' + (conAlerta > 0 ? 'var(--rojo)' : 'var(--verde-medio)') + '">' + conAlerta + '</div></div>';
+
+  // Resumen por producto (último registro de cada uno)
+  const panel = document.getElementById('resumen-alimentos');
+  if (productos.length === 0) {
+    panel.innerHTML = '<p style="color:var(--gris-texto);font-size:0.85rem">Sin registros.</p>';
+  } else {
+    panel.innerHTML = productos.map(function(p) {
+      const rs = regs.filter(function(a) { return a.producto === p; });
+      const ul = rs[rs.length - 1];
+      const totalCant = ul.cantidad * (ul.kg || 1);
+      const dias      = ul.consumoDiario > 0 ? Math.floor(totalCant / ul.consumoDiario) : null;
+      let fechaAgota = null;
+      if (dias !== null) {
+        const fa = new Date(ul.fecha);
+        fa.setDate(fa.getDate() + dias);
+        fechaAgota = fa.toISOString().split('T')[0];
+      }
+      return '<div style="padding:10px 0;border-bottom:1px solid var(--gris-borde)">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">' +
+          '<div><strong style="font-size:0.9rem">' + p + '</strong> <span class="badge badge-gris">' + (CATS_ALIMENTO[ul.categoria] || ul.categoria || '📦 Otro') + '</span>' +
+            '<p style="font-size:0.78rem;color:var(--gris-texto);margin-top:4px">Última compra: ' + fmt(ul.fecha) + ' · ' + ul.cantidad + ' ' + (ul.unidad || 'kg') + (ul.kg && ul.kg !== 1 ? ' (' + totalCant.toFixed(1) + ' kg/L totales)' : '') + '</p></div>' +
+          '<div style="text-align:right">' +
+            (dias !== null ? '<div style="font-weight:700;color:' + (dias < 14 ? 'var(--rojo)' : 'var(--verde-medio)') + '">' + dias + ' días</div><div style="font-size:0.75rem;color:var(--gris-texto)">hasta ' + fmt(fechaAgota) + '</div>' : '<div style="font-size:0.78rem;color:var(--gris-texto)">sin consumo diario</div>') +
+          '</div>' +
+        '</div>' +
+        (ul.notas ? '<p style="font-size:0.78rem;color:var(--gris-texto);margin-top:4px">📝 ' + ul.notas + '</p>' : '') +
       '</div>';
-  });
-  document.getElementById('tbody-alimento').innerHTML = db.alimentacion.map(function(a) {
-    const totalKg = a.cantidad * a.kg;
-    const dias    = a.consumoDiario > 0 ? Math.floor(totalKg / a.consumoDiario) : '-';
+    }).join('');
+  }
+
+  document.getElementById('tbody-alimento').innerHTML = regs.slice().reverse().map(function(a) {
+    const totalCant = a.cantidad * (a.kg || 1);
+    const dias = a.consumoDiario > 0 ? Math.floor(totalCant / a.consumoDiario) : null;
     return '<tr>' +
-      '<td><span class="badge ' + (a.tipo === 'heno' ? 'badge-verde' : 'badge-tierra') + '">' + (a.tipo === 'heno' ? '🌿 Heno' : '🌽 Concentrado') + '</span></td>' +
-      '<td>' + fmt(a.fecha) + '</td><td>' + a.cantidad + '</td><td>' + a.kg + ' kg</td><td>' + a.consumoDiario + ' kg/día</td>' +
-      '<td><strong>' + dias + ' días</strong></td><td style="color:var(--gris-texto)">' + (a.notas || '-') + '</td>' +
+      '<td><strong>' + a.producto + '</strong></td>' +
+      '<td><span class="badge badge-gris">' + (CATS_ALIMENTO[a.categoria] || a.categoria || '📦 Otro') + '</span></td>' +
+      '<td>' + fmt(a.fecha) + '</td>' +
+      '<td>' + a.cantidad + ' ' + (a.unidad || 'kg') + (a.kg && a.kg !== 1 ? ' (' + totalCant.toFixed(1) + ')' : '') + '</td>' +
+      '<td>' + (a.consumoDiario ? a.consumoDiario + ' /día' : '-') + '</td>' +
+      '<td>' + (dias !== null ? '<strong>' + dias + ' días</strong>' : '-') + '</td>' +
+      '<td>' + (a.costo ? moneda(a.costo) : '-') + '</td>' +
+      '<td style="color:var(--gris-texto)">' + (a.notas || '-') + '</td>' +
       '<td><button class="btn btn-sm btn-rojo" onclick="eliminarAlimento(\'' + a.id + '\')">🗑️</button></td>' +
       '</tr>';
-  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
 }
 
 // ============================================================
@@ -1329,6 +1527,53 @@ function renderInventario() {
       '<td>' + a.sexo + '</td><td>' + (a.raza || '-') + '</td><td>' + edad(a.nacimiento) + '</td>' +
       '<td>' + a.peso + ' kg</td><td>' + badgeEstado(a.estado) + '</td></tr>';
   }).join('');
+
+  renderInventarioMedicamentos();
+}
+
+// — INVENTARIO DE MEDICAMENTOS —
+function renderInventarioMedicamentos() {
+  const meds = db.medicamentos;
+  const hoy  = hoyISO();
+
+  // Alertas: vencidos / próximos a vencer / agotados
+  const alertas = [];
+  meds.forEach(function(m) {
+    if (m.cantidad <= 0) {
+      alertas.push({ texto: '⚠️ "' + m.nombre + '" está agotado', tipo: 'roja' });
+    }
+    if (m.vencimiento) {
+      const d = diasPara(m.vencimiento);
+      if (d < 0)        alertas.push({ texto: '⛔ "' + m.nombre + '" venció hace ' + Math.abs(d) + ' día(s)', tipo: 'roja' });
+      else if (d <= 30) alertas.push({ texto: '⏳ "' + m.nombre + '" vence en ' + d + ' día(s) (' + fmt(m.vencimiento) + ')', tipo: 'amarilla' });
+    }
+  });
+  const panel = document.getElementById('alertas-medicamentos');
+  if (alertas.length === 0) {
+    panel.innerHTML = '<p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas de medicamentos</p>';
+  } else {
+    panel.innerHTML = alertas.map(function(a) {
+      return '<div class="alerta-item alerta-' + a.tipo + '"><div><strong style="font-size:0.83rem">' + a.texto + '</strong></div></div>';
+    }).join('');
+  }
+
+  document.getElementById('tbody-medicamentos').innerHTML = meds.map(function(m) {
+    const d = m.vencimiento ? diasPara(m.vencimiento) : null;
+    let vencBadge = '-';
+    if (m.vencimiento) {
+      const cls = d < 0 ? 'badge-rojo' : (d <= 30 ? 'badge-amarillo' : 'badge-verde');
+      vencBadge = '<span class="badge ' + cls + '">' + fmt(m.vencimiento) + '</span>';
+    }
+    return '<tr>' +
+      '<td><strong>' + m.nombre + '</strong></td>' +
+      '<td><span class="badge ' + (m.cantidad <= 0 ? 'badge-rojo' : 'badge-azul') + '">' + m.cantidad + ' ' + m.unidad + '</span></td>' +
+      '<td>' + vencBadge + '</td>' +
+      '<td style="color:var(--gris-texto)">' + (m.notas || '-') + '</td>' +
+      '<td style="display:flex;gap:6px">' +
+        '<button class="btn btn-sm btn-outline" onclick="editarMedicamento(\'' + m.id + '\')">✏️</button>' +
+        '<button class="btn btn-sm btn-rojo" onclick="eliminarMedicamento(\'' + m.id + '\')">🗑️</button>' +
+      '</td></tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin medicamentos registrados</td></tr>';
 }
 
 // ============================================================
@@ -1402,4 +1647,210 @@ function importarCSV(input) {
     alert('✅ ' + agregados + ' animal(es) importados y sincronizados');
   };
   reader.readAsText(file, 'UTF-8');
+}
+
+// ============================================================
+// EXPORTAR FICHA A WORD (.docx)
+// ============================================================
+function dataURLtoUint8Array(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binStr = atob(base64);
+  const bytes  = new Uint8Array(binStr.length);
+  for (let i = 0; i < binStr.length; i++) bytes[i] = binStr.charCodeAt(i);
+  return bytes;
+}
+
+function descargarFichaWord() {
+  if (!idFichaActual) return;
+  const a = db.animales.find(function(x) { return x.id === idFichaActual; });
+  if (!a) return;
+
+  if (!window.docx) { alert('⚠️ No se pudo cargar el generador de Word. Verifica tu conexión a internet.'); return; }
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, ImageRun,
+          HeadingLevel, BorderStyle, WidthType, ShadingType, AlignmentType } = window.docx;
+
+  const btn = document.getElementById('btn-descargar-ficha');
+  const textoOriginal = btn.textContent;
+  btn.textContent = '⏳ Generando...';
+  btn.disabled = true;
+
+  const border  = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' };
+  const borders = { top: border, bottom: border, left: border, right: border };
+  const margins = { top: 70, bottom: 70, left: 100, right: 100 };
+  const TABLE_W = 9360;
+
+  function celda(texto, opts) {
+    opts = opts || {};
+    return new TableCell({
+      borders, margins,
+      width: { size: opts.width || (TABLE_W / 2), type: WidthType.DXA },
+      shading: opts.shading ? { fill: opts.shading, type: ShadingType.CLEAR } : undefined,
+      children: [new Paragraph({ children: [new TextRun({ text: String(texto), bold: !!opts.bold, size: 20 })] })]
+    });
+  }
+
+  function tablaSimple(headers, filas, anchos) {
+    const w = anchos || headers.map(function() { return Math.floor(TABLE_W / headers.length); });
+    const filaHeader = new TableRow({
+      children: headers.map(function(h, i) { return celda(h, { bold: true, shading: 'E8F4FD', width: w[i] }); })
+    });
+    const filasDatos = filas.map(function(f) {
+      return new TableRow({ children: f.map(function(c, i) { return celda(c, { width: w[i] }); }) });
+    });
+    return new Table({ width: { size: TABLE_W, type: WidthType.DXA }, columnWidths: w, rows: [filaHeader].concat(filasDatos) });
+  }
+
+  function tituloSeccion(texto) {
+    return new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 240, after: 120 }, children: [new TextRun(texto)] });
+  }
+
+  // Datos relacionados
+  const saludA  = db.salud.filter(function(s) { return s.animalId === idFichaActual; }).sort(function(x,y){ return x.fecha > y.fecha ? -1 : 1; });
+  const reproA  = db.reproductivo.filter(function(r) { return r.animalId === idFichaActual; });
+  const lecheA  = db.leche.filter(function(l) { return l.animalId === idFichaActual; });
+  const carneA  = db.carne.filter(function(c) { return c.animalId === idFichaActual; }).sort(function(x,y){ return x.fecha > y.fecha ? 1 : -1; });
+  const tipoIcon = { vacuna: 'Vacuna', desparasitacion: 'Desparasitacion', herraje: 'Herraje', odontologia: 'Odontologia', vitamina: 'Vitamina', otro: 'Otro' };
+
+  const children = [];
+
+  // Encabezado
+  children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun((a.tipo === 'bovino' ? 'Bovino' : 'Equino') + ' — ' + a.nombre)] }));
+  children.push(new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: 'Ficha generada el ' + fmt(hoyISO()) + ' · ' + (db.config.nombre || 'Mi Finca'), italics: true, size: 18, color: '666666' })] }));
+
+  // Foto si existe
+  if (a.foto) {
+    try {
+      const imgBytes = dataURLtoUint8Array(a.foto);
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 200 },
+        children: [new ImageRun({ type: 'jpg', data: imgBytes, transformation: { width: 200, height: 200 } })]
+      }));
+    } catch(e) { console.error('Error agregando foto al Word:', e); }
+  }
+
+  // Información general
+  children.push(tituloSeccion('Información general'));
+  children.push(tablaSimple(['Campo', 'Valor'], [
+    ['ID', a.id],
+    ['Tipo', a.tipo === 'bovino' ? 'Bovino' : 'Equino'],
+    ['Sexo', a.sexo],
+    ['Raza', a.raza || '-'],
+    ['Fecha de nacimiento', fmt(a.nacimiento)],
+    ['Edad', edad(a.nacimiento)],
+    ['Peso actual', a.peso + ' kg'],
+    ['Estado', a.estado],
+    ['Procedencia', a.procedencia],
+    ['Madre', a.madre || '-'],
+    ['Padre', a.padre || '-'],
+  ], [3000, 6360]));
+
+  if (a.notas) {
+    children.push(new Paragraph({ spacing: { before: 120 }, children: [new TextRun({ text: 'Notas: ', bold: true }), new TextRun(a.notas)] }));
+  }
+
+  // Ubicación / potrero
+  children.push(tituloSeccion('Ubicación'));
+  if (a.potrero) {
+    const diasEn = a.potreroFecha ? Math.abs(diasPara(a.potreroFecha)) : null;
+    children.push(new Paragraph({ children: [new TextRun({ text: 'Potrero / lugar actual: ', bold: true }), new TextRun(a.potrero)] }));
+    if (a.potreroFecha) {
+      children.push(new Paragraph({ children: [new TextRun({ text: 'Desde: ', bold: true }), new TextRun(fmt(a.potreroFecha) + (diasEn !== null ? ' (hace ' + diasEn + ' días)' : ''))] }));
+    }
+  } else {
+    children.push(new Paragraph({ children: [new TextRun('No se ha registrado un potrero o ubicación para este animal.')] }));
+  }
+
+  // Historial médico / medicamentos
+  children.push(tituloSeccion('Historial médico y medicamentos'));
+  if (saludA.length === 0) {
+    children.push(new Paragraph({ children: [new TextRun('Sin registros médicos.')] }));
+  } else {
+    children.push(tablaSimple(
+      ['Fecha', 'Tipo', 'Descripción', 'Medicamento / Dosis', 'Próxima', 'Veterinario'],
+      saludA.map(function(s) {
+        return [
+          fmt(s.fecha),
+          tipoIcon[s.tipo] || s.tipo,
+          s.desc || '-',
+          (s.medicamento || '-') + (s.dosis ? ' (' + s.dosis + ')' : ''),
+          s.proxima ? fmt(s.proxima) : '-',
+          s.veterinario || '-'
+        ];
+      }),
+      [1100, 1300, 2300, 2160, 1100, 1400]
+    ));
+  }
+
+  // Producción de leche
+  if (a.tipo === 'bovino' && a.sexo === 'hembra' && lecheA.length > 0) {
+    const totalL = lecheA.reduce(function(s, l) { return s + l.litros; }, 0);
+    const promL  = (totalL / lecheA.length).toFixed(1);
+    children.push(tituloSeccion('Producción de leche'));
+    children.push(new Paragraph({ children: [new TextRun('Registros: ' + lecheA.length + ' · Total: ' + totalL.toFixed(1) + ' L · Promedio: ' + promL + ' L/día')] }));
+  }
+
+  // Historial de pesajes / carne
+  if (carneA.length > 0) {
+    children.push(tituloSeccion('Historial de pesajes'));
+    let gananciaTotal = '-';
+    if (carneA.length >= 2) gananciaTotal = (carneA[carneA.length-1].peso - carneA[0].peso).toFixed(1) + ' kg';
+    children.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun('Ganancia total: ' + gananciaTotal)] }));
+    children.push(tablaSimple(
+      ['Fecha', 'Peso (kg)', 'Precio/kg', 'Destino', 'Observaciones'],
+      carneA.slice().sort(function(x,y){ return x.fecha > y.fecha ? -1 : 1; }).map(function(c) {
+        const destLabel = { seguimiento: 'Seguimiento', venta: 'Venta', faena: 'Faena', subasta: 'Subasta' };
+        return [fmt(c.fecha), c.peso, c.precioKg > 0 ? moneda(c.precioKg) : '-', destLabel[c.destino] || c.destino, c.obs || '-'];
+      }),
+      [1300, 1300, 1500, 1500, 3760]
+    ));
+  }
+
+  // Historial reproductivo
+  if (reproA.length > 0) {
+    children.push(tituloSeccion('Historial reproductivo'));
+    children.push(tablaSimple(
+      ['Fecha', 'Evento', 'Macho', '¿Gestante?', 'Parto estimado', 'Observaciones'],
+      reproA.map(function(r) {
+        return [fmt(r.fecha), r.tipo, r.macho || '-', r.gestante === 'si' ? 'Sí' : 'No', r.fechaParto ? fmt(r.fechaParto) : '-', r.obs || '-'];
+      }),
+      [1100, 1300, 1300, 1100, 1500, 3060]
+    ));
+  }
+
+  const doc = new Document({
+    styles: {
+      default: { document: { run: { font: 'Arial', size: 22 } } },
+      paragraphStyles: [
+        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 32, bold: true, font: 'Arial', color: '1B4332' },
+          paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 0 } },
+        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 26, bold: true, font: 'Arial', color: '2D6A4F' },
+          paragraph: { spacing: { before: 200, after: 100 }, outlineLevel: 1 } },
+      ]
+    },
+    sections: [{
+      properties: {
+        page: { size: { width: 12240, height: 15840 }, margin: { top: 1080, right: 1440, bottom: 1080, left: 1440 } }
+      },
+      children
+    }]
+  });
+
+  Packer.toBlob(doc).then(function(blob) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'ficha-' + a.id + '-' + (a.nombre || 'animal').replace(/[^a-zA-Z0-9-_]/g, '_') + '.docx';
+    link.click();
+    URL.revokeObjectURL(url);
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
+  }).catch(function(e) {
+    console.error('Error generando Word:', e);
+    alert('⚠️ Error al generar el documento Word');
+    btn.textContent = textoOriginal;
+    btn.disabled = false;
+  });
 }
