@@ -613,8 +613,40 @@ tr:last-child td { border-bottom: none; }
   font-size: 2rem; flex-shrink: 0;
 }
 
+/* ============ CALENDARIO ============ */
+.calendario-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.cal-dia-nombre {
+  text-align: center; font-size: 0.72rem; font-weight: 700;
+  color: var(--gris-texto); text-transform: uppercase; padding-bottom: 4px;
+}
+.cal-celda {
+  min-height: 78px; border-radius: 8px; padding: 5px;
+  background: var(--crema); border: 1px solid var(--gris-borde);
+  font-size: 0.7rem; overflow: hidden;
+}
+.cal-celda.vacia { background: transparent; border: none; }
+.cal-celda.hoy { border: 2px solid var(--verde-medio); }
+.cal-num { font-weight: 700; font-size: 0.76rem; margin-bottom: 3px; color: var(--verde-oscuro); }
+.cal-evento {
+  display: block; border-radius: 4px; padding: 1px 4px; margin-bottom: 2px;
+  font-size: 0.64rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: #fff; cursor: default;
+}
+.cal-evento.salud   { background: var(--rojo); }
+.cal-evento.repro   { background: #9D4EDD; }
+.cal-evento.med     { background: #0096C7; }
+.cal-evento.servicio{ background: var(--tierra); }
+.cal-leyenda-item { display: flex; align-items: center; gap: 5px; color: var(--gris-texto); }
+.cal-leyenda-dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
 /* ============ RESPONSIVE ============ */
 @media (max-width: 700px) {
   .form-grid, .form-grid.cols3 { grid-template-columns: 1fr; }
   .page { padding: 1rem; }
+  .calendario-grid { grid-template-columns: repeat(7, 1fr); }
+  .cal-celda { min-height: 50px; font-size: 0.6rem; }
+  .cal-evento { font-size: 0.55rem; }
 }

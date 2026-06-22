@@ -18,55 +18,6 @@
 </head>
 <body>
 
-<!-- ===== PANTALLA: CONFIGURAR FIREBASE ===== -->
-<div id="pantalla-configurar" style="display:none; min-height:100vh; align-items:center; justify-content:center; padding:1rem; background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 50%, #52b788 100%);">
-  <div class="config-card">
-    <h2>⚙️ Configuración inicial</h2>
-    <p>Para sincronizar tu finca entre dispositivos, necesitas conectar Firebase (gratuito).</p>
-
-    <div class="config-step">
-      <span class="step-num">1</span>
-      Ve a <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> e inicia sesión con tu cuenta Google.
-    </div>
-    <div class="config-step">
-      <span class="step-num">2</span>
-      Crea un proyecto nuevo → pon cualquier nombre (ej: <strong>mi-finca</strong>) → desactiva Google Analytics → <strong>Crear proyecto</strong>.
-    </div>
-    <div class="config-step">
-      <span class="step-num">3</span>
-      En el proyecto, haz clic en el ícono <strong>&lt;/&gt;</strong> (Web) → registra la app → copia la configuración <code>firebaseConfig</code>.
-    </div>
-    <div class="config-step">
-      <span class="step-num">4</span>
-      En el menú izquierdo: <strong>Authentication → Comenzar → Email/Contraseña → Habilitar</strong>.
-    </div>
-    <div class="config-step">
-      <span class="step-num">5</span>
-      En el menú izquierdo: <strong>Firestore Database → Crear base de datos → Modo de prueba → Listo</strong>.
-    </div>
-
-    <div class="config-fields">
-      <div>
-        <label>Pega aquí el objeto firebaseConfig completo</label>
-        <textarea id="cfg-paste" placeholder='const firebaseConfig = {
-  apiKey: "...",
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
-};'></textarea>
-      </div>
-      <div id="cfg-error" style="color:var(--rojo);font-size:0.8rem;display:none"></div>
-      <button class="btn-login" onclick="guardarConfigFirebase()">✅ Conectar y comenzar</button>
-    </div>
-
-    <div style="margin-top:1rem;padding:12px;background:var(--verde-pastel);border-radius:8px;font-size:0.78rem;color:var(--verde-oscuro)">
-      <strong>🔒 Privacidad:</strong> Tu configuración se guarda solo en este navegador. Firebase es gratuito para uso personal (hasta 1GB de datos, más que suficiente para una finca).
-    </div>
-  </div>
-</div>
-
 <!-- ===== PANTALLA: LOGIN ===== -->
 <div id="pantalla-login" style="display:none">
   <div class="login-card">
@@ -109,11 +60,6 @@
       </div>
     </div>
 
-    <div style="text-align:center;margin-top:1.5rem">
-      <button onclick="cambiarFirebase()" style="background:none;border:none;color:var(--gris-texto);font-size:0.75rem;cursor:pointer;font-family:Nunito">
-        ⚙️ Cambiar configuración Firebase
-      </button>
-    </div>
   </div>
 </div>
 
@@ -133,8 +79,11 @@
       <p>Sistema de gestión ganadera</p>
     </div>
     <nav>
-      <div class="nav-item active" onclick="mostrarPagina('dashboard')">
+      <div class="nav-item" onclick="mostrarPagina('dashboard')">
         <span class="icon">🏠</span> Panel principal
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('calendario')">
+        <span class="icon">📅</span> Calendario
       </div>
       <div class="nav-item" onclick="mostrarPagina('animales')">
         <span class="icon">🐴</span> Mis animales
@@ -216,6 +165,28 @@
         <div class="card-body">
           <div id="grafico-leche" style="display:flex;align-items:flex-end;gap:10px;height:100px"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- CALENDARIO -->
+    <div class="page" id="page-calendario">
+      <div class="section-title">
+        <div><h2>📅 Calendario de la finca</h2><p>Todas las novedades en un solo lugar: vacunas, partos, vencimientos y servicios</p></div>
+      </div>
+      <div class="card">
+        <div class="card-header" style="justify-content:center;gap:16px">
+          <button class="btn btn-sm btn-outline" onclick="cambiarMesCalendario(-1)">← Anterior</button>
+          <h3 id="cal-titulo-mes" style="min-width:180px;text-align:center">—</h3>
+          <button class="btn btn-sm btn-outline" onclick="cambiarMesCalendario(1)">Siguiente →</button>
+        </div>
+        <div class="card-body">
+          <div id="cal-leyenda" style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:0.8rem;font-size:0.78rem"></div>
+          <div id="cal-grid" class="calendario-grid"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1.2rem">
+        <div class="card-header"><h3>Próximas novedades</h3></div>
+        <div class="card-body" id="cal-lista-eventos"></div>
       </div>
     </div>
 
@@ -341,6 +312,19 @@
         <div class="tabla-wrap">
           <table><thead><tr><th>Animal</th><th>Evento</th><th>Fecha</th><th>Macho</th><th>¿Gestante?</th><th>Parto estimado</th><th>Días rest.</th><th>Acción</th></tr></thead>
           <tbody id="tbody-repro"></tbody></table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:1.2rem;border-left:4px solid var(--tierra)">
+        <div class="card-header"><h3>🐎 Servicios de monta (caballos enteros)</h3>
+          <button class="btn btn-sm btn-verde" onclick="abrirModal('modal-servicio')">+ Registrar servicio</button>
+        </div>
+        <div class="card-body" style="padding-top:0">
+          <p style="color:var(--gris-texto);font-size:0.82rem;margin-bottom:0.6rem">Registra cada yegua que llevan a montar con un semental de la finca, el dueño y el valor cobrado. Al marcarlo como pagado, se agrega automáticamente como ingreso en Finanzas.</p>
+        </div>
+        <div class="tabla-wrap">
+          <table><thead><tr><th>Semental</th><th>Yegua</th><th>Dueño</th><th>Fecha</th><th>Valor</th><th>Estado</th><th>Notas</th><th>Acción</th></tr></thead>
+          <tbody id="tbody-servicios"></tbody></table>
         </div>
       </div>
     </div>
@@ -490,9 +474,16 @@
             </div>
           </div>
         </div>
-        <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="a-tipo"><option value="bovino">🐄 Bovino</option><option value="equino">🐎 Equino</option></select></div>
+        <div class="form-group"><label>Tipo <span class="req">*</span></label><select id="a-tipo" onchange="actualizarVisibilidadReproductivo()"><option value="bovino">🐄 Bovino</option><option value="equino">🐎 Equino</option></select></div>
         <div class="form-group"><label>Nombre <span class="req">*</span></label><input type="text" id="a-nombre" placeholder="Ej: Valentina"></div>
-        <div class="form-group"><label>Sexo <span class="req">*</span></label><select id="a-sexo"><option value="hembra">Hembra</option><option value="macho">Macho</option></select></div>
+        <div class="form-group"><label>Sexo <span class="req">*</span></label><select id="a-sexo" onchange="actualizarVisibilidadReproductivo()"><option value="hembra">Hembra</option><option value="macho">Macho</option></select></div>
+        <div class="form-group" id="grupo-estado-reproductivo" style="display:none">
+          <label>Estado reproductivo</label>
+          <select id="a-estado-reproductivo">
+            <option value="entero">🐎 Entero (semental)</option>
+            <option value="capon">✂️ Capado / castrado</option>
+          </select>
+        </div>
         <div class="form-group"><label>Raza</label><input type="text" id="a-raza" placeholder="Ej: Holstein, Paso Fino"></div>
         <div class="form-group"><label>Fecha de nacimiento <span class="req">*</span></label><input type="date" id="a-nacimiento"></div>
         <div class="form-group"><label>Peso actual (kg) <span class="req">*</span></label><input type="number" id="a-peso" placeholder="Ej: 450"></div>
@@ -596,7 +587,32 @@
   </div>
 </div>
 
-<!-- Modal: Salud -->
+<!-- Modal: Servicio de monta -->
+<div class="modal-overlay" id="modal-servicio">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header"><h3>🐎 Registrar servicio de monta</h3><button class="modal-close" onclick="cerrarModal('modal-servicio')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label>Semental (caballo entero de la finca) <span class="req">*</span></label><select id="sv-semental"></select></div>
+        <div class="form-group"><label>Nombre de la yegua <span class="req">*</span></label><input type="text" id="sv-yegua" placeholder="Ej: Estrella"></div>
+        <div class="form-group"><label>Dueño de la yegua <span class="req">*</span></label><input type="text" id="sv-dueno" placeholder="Ej: Juan Pérez"></div>
+        <div class="form-group"><label>Fecha del servicio <span class="req">*</span></label><input type="date" id="sv-fecha"></div>
+        <div class="form-group"><label>Valor cobrado <span class="req">*</span></label><input type="number" id="sv-valor" placeholder="Ej: 300000"></div>
+        <div class="form-group"><label>Estado de pago</label>
+          <select id="sv-estado">
+            <option value="pendiente">⏳ Pendiente de pago</option>
+            <option value="pagado">✅ Pagado</option>
+          </select>
+        </div>
+        <div class="form-group form-full"><label>Notas</label><input type="text" id="sv-notas" placeholder="Teléfono del dueño, condiciones, etc."></div>
+        <div class="form-actions">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-servicio')">Cancelar</button>
+          <button class="btn btn-verde" onclick="guardarServicio()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="modal-salud">
   <div class="modal" style="max-width:600px">
     <div class="modal-header"><h3>💉 Registrar evento médico</h3><button class="modal-close" onclick="cerrarModal('modal-salud')">×</button></div>
@@ -642,6 +658,7 @@
           </select>
         </div>
         <div class="form-group"><label>Fecha de vencimiento</label><input type="date" id="m-vencimiento"></div>
+        <div class="form-group"><label>Costo de la compra</label><input type="number" id="m-costo" placeholder="Ej: 80000"></div>
         <div class="form-group form-full"><label>Notas</label><input type="text" id="m-notas" placeholder="Proveedor, lote, etc."></div>
         <div class="form-actions">
           <button class="btn btn-outline" onclick="cerrarModal('modal-medicamento')">Cancelar</button>
@@ -701,9 +718,10 @@
   <div class="modal">
     <div class="modal-header"><h3>💸 Registrar gasto</h3><button class="modal-close" onclick="cerrarModal('modal-gasto')">×</button></div>
     <div class="modal-body">
+      <p style="font-size:0.8rem;color:var(--gris-texto);margin-bottom:0.8rem">Usa esto solo para gastos que no tengan su propia sección (arriendo, mano de obra, infraestructura, etc.). Los gastos de alimentación, medicamentos y los ingresos por venta de animales o servicios de monta ya se registran automáticamente desde su sección.</p>
       <div class="form-grid">
         <div class="form-group"><label>Fecha <span class="req">*</span></label><input type="date" id="g-fecha"></div>
-        <div class="form-group"><label>Categoría</label><select id="g-cat"><option value="alimentacion">🌾 Alimentación</option><option value="salud">💉 Salud</option><option value="infraestructura">🏗️ Infraestructura</option><option value="mano_obra">👷 Mano de obra</option><option value="compra_animal">🐄 Compra animal</option><option value="otro">📌 Otro</option></select></div>
+        <div class="form-group"><label>Categoría</label><select id="g-cat"><option value="infraestructura">🏗️ Infraestructura</option><option value="mano_obra">👷 Mano de obra</option><option value="compra_animal">🐄 Compra animal</option><option value="otro">📌 Otro</option></select></div>
         <div class="form-group"><label>Valor (pesos) <span class="req">*</span></label><input type="number" id="g-valor"></div>
         <div class="form-group"><label>Proveedor</label><input type="text" id="g-prov"></div>
         <div class="form-group form-full"><label>Descripción <span class="req">*</span></label><input type="text" id="g-desc"></div>

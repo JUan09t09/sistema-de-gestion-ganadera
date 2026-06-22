@@ -4,9 +4,18 @@
 // ============================================================
 
 // ============================================================
-// CONFIGURACIÓN FIREBASE
+// CONFIGURACIÓN FIREBASE (fija para todos los usuarios)
 // ============================================================
-const CONFIG_KEY   = 'miFincaFirebaseConfig';
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAk1p71Kws4P6FBJINkpvat7PtXlYR3oA0",
+  authDomain: "finca-e350f.firebaseapp.com",
+  projectId: "finca-e350f",
+  storageBucket: "finca-e350f.firebasestorage.app",
+  messagingSenderId: "465392032945",
+  appId: "1:465392032945:web:99e6eb26e5388291f01690",
+  measurementId: "G-JC35C3W5Y1"
+};
+
 const DB_CACHE_KEY = 'miFincaDBCache';
 
 let firebaseApp    = null;
@@ -22,7 +31,7 @@ let modoTab        = 'login';
 function crearDBVacia() {
   return {
     config: { nombre: 'Mi Finca', propietario: 'Administrador', lugar: '' },
-    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: []
+    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [], servicios: []
   };
 }
 
@@ -38,62 +47,9 @@ function normalizarDB(datos) {
     alimentacion: Array.isArray(seguro.alimentacion) ? seguro.alimentacion : [],
     finanzas:     Array.isArray(seguro.finanzas)     ? seguro.finanzas     : [],
     carne:        Array.isArray(seguro.carne)        ? seguro.carne        : [],
-    medicamentos: Array.isArray(seguro.medicamentos) ? seguro.medicamentos : []
+    medicamentos: Array.isArray(seguro.medicamentos) ? seguro.medicamentos : [],
+    servicios:    Array.isArray(seguro.servicios)    ? seguro.servicios    : []
   };
-}
-
-function parsearFirebaseConfig(texto) {
-  try {
-    const jsonMatch = texto.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No se encontró objeto JSON');
-    const jsonStr = jsonMatch[0]
-      .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
-      .replace(/'/g, '"');
-    return JSON.parse(jsonStr);
-  } catch(e) {
-    const config = {};
-    const campos = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
-    for (const campo of campos) {
-      const m = texto.match(new RegExp(campo + '\\s*:\\s*["\']([^"\']+)["\']'));
-      if (m) config[campo] = m[1];
-    }
-    if (!config.apiKey) throw new Error('No se pudo extraer apiKey');
-    return config;
-  }
-}
-
-function validarFirebaseConfig(cfg) {
-  const campos = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId'];
-  const faltantes = campos.filter(function(campo) {
-    return !cfg[campo] || String(cfg[campo]).trim() === '';
-  });
-  if (faltantes.length > 0) throw new Error('Faltan campos requeridos: ' + faltantes.join(', '));
-  const placeholders = Object.values(cfg).filter(function(valor) {
-    return typeof valor === 'string' && valor.replace(/\s+/g, '') === '...';
-  });
-  if (placeholders.length > 0) throw new Error('La configuración parece de ejemplo. Pega los valores reales de Firebase.');
-  return true;
-}
-
-function guardarConfigFirebase() {
-  const texto  = document.getElementById('cfg-paste').value.trim();
-  const errDiv = document.getElementById('cfg-error');
-  errDiv.style.display = 'none';
-  if (!texto) { errDiv.textContent = 'Pega la configuración de Firebase'; errDiv.style.display = 'block'; return; }
-  try {
-    const cfg = parsearFirebaseConfig(texto);
-    validarFirebaseConfig(cfg);
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
-    inicializarFirebase(cfg);
-  } catch(e) {
-    errDiv.textContent = '⚠️ Error: ' + e.message + '. Asegúrate de pegar el objeto firebaseConfig real de tu proyecto.';
-    errDiv.style.display = 'block';
-  }
-}
-
-function cambiarFirebase() {
-  document.getElementById('pantalla-login').style.display      = 'none';
-  document.getElementById('pantalla-configurar').style.display = 'flex';
 }
 
 function inicializarFirebase(config) {
@@ -105,7 +61,6 @@ function inicializarFirebase(config) {
     auth        = firebase.auth();
     firestore   = firebase.firestore();
 
-    document.getElementById('pantalla-configurar').style.display = 'none';
     mostrarCargando('Conectando con Firebase...');
 
     auth.onAuthStateChanged(function(user) {
@@ -126,17 +81,7 @@ function inicializarFirebase(config) {
 // INICIO DE LA APP
 // ============================================================
 window.addEventListener('DOMContentLoaded', function() {
-  const cfgGuardada = localStorage.getItem(CONFIG_KEY);
-  if (cfgGuardada) {
-    try {
-      const cfg = JSON.parse(cfgGuardada);
-      inicializarFirebase(cfg);
-    } catch(e) {
-      mostrarConfiguracion();
-    }
-  } else {
-    mostrarConfiguracion();
-  }
+  inicializarFirebase(FIREBASE_CONFIG);
 
   document.querySelectorAll('.modal-overlay').forEach(function(m) {
     m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
@@ -146,15 +91,7 @@ window.addEventListener('DOMContentLoaded', function() {
   document.addEventListener('keydown', function(e) { if (e.key === 'Escape') cerrarSidebar(); });
 });
 
-function mostrarConfiguracion() {
-  document.getElementById('pantalla-cargando').style.display   = 'none';
-  document.getElementById('pantalla-login').style.display      = 'none';
-  document.getElementById('app-principal').style.display       = 'none';
-  document.getElementById('pantalla-configurar').style.display = 'flex';
-}
-
 function mostrarCargando(texto) {
-  document.getElementById('pantalla-configurar').style.display = 'none';
   document.getElementById('pantalla-login').style.display      = 'none';
   document.getElementById('app-principal').style.display       = 'none';
   document.getElementById('pantalla-cargando').style.display   = 'flex';
@@ -219,7 +156,7 @@ function accionLogin() {
       .then(function(cred) {
         return firestore.collection('usuarios').doc(cred.user.uid).set({
           config: { nombre: finca, propietario: nombre, lugar: '' },
-          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [],
+          animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [], servicios: [],
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
       })
@@ -322,6 +259,7 @@ function setSyncState(estado, texto) {
 // ============================================================
 const TITULOS = {
   dashboard:    '🏠 Panel principal',
+  calendario:   '📅 Calendario de la finca',
   animales:     '🐴 Mis animales',
   leche:        '🥛 Producción de leche',
   carne:        '🥩 Producción de carne',
@@ -343,6 +281,7 @@ function mostrarPagina(nombre) {
     if ((n.getAttribute('onclick') || '').indexOf(nombre) !== -1) n.classList.add('active');
   });
   if (nombre === 'dashboard')    renderDashboard();
+  if (nombre === 'calendario')   renderCalendario();
   if (nombre === 'animales')     renderTablaAnimales();
   if (nombre === 'leche')        renderLeche();
   if (nombre === 'carne')        renderCarne();
@@ -423,7 +362,8 @@ function abrirModal(id) {
   if (id === 'modal-repro')  llenarSelectHembras();
   if (id === 'modal-salud') { llenarSelectAnimales(); llenarSelectMedicamentos(); }
   if (id === 'modal-pesaje') llenarSelectAnimalesCarne();
-  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha','m-vencimiento'].forEach(function(fid) {
+  if (id === 'modal-servicio') llenarSelectSementales();
+  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha','m-vencimiento','sv-fecha'].forEach(function(fid) {
     const el = document.getElementById(fid);
     if (el && !el.value && fid !== 'm-vencimiento') el.value = hoyISO();
   });
@@ -491,6 +431,17 @@ function seleccionarMedicamentoSalud(medId) {
   document.getElementById('s-medicamento').value = m.nombre;
 }
 
+function llenarSelectSementales() {
+  const sel = document.getElementById('sv-semental');
+  sel.innerHTML = '<option value="">Seleccionar semental...</option>';
+  db.animales
+    .filter(function(a) { return a.tipo === 'equino' && a.sexo === 'macho' && a.estado === 'activo' && a.estadoReproductivo === 'entero'; })
+    .forEach(function(a) { sel.innerHTML += '<option value="' + a.id + '">' + a.nombre + ' (' + a.id + ')</option>'; });
+  if (sel.options.length === 1) {
+    sel.innerHTML += '<option value="" disabled>— No tienes caballos enteros registrados —</option>';
+  }
+}
+
 // ============================================================
 // GUARDAR DATOS — CONFIGURACIÓN
 // ============================================================
@@ -518,9 +469,18 @@ function resetFormularioAnimal() {
   document.getElementById('a-sexo').value        = 'hembra';
   document.getElementById('a-procedencia').value = 'nacido';
   document.getElementById('a-estado').value      = 'activo';
+  document.getElementById('a-estado-reproductivo').value = 'entero';
   document.getElementById('a-foto-input').value  = '';
   fotoTemporal = null;
   actualizarPreviewFoto(null);
+  actualizarVisibilidadReproductivo();
+}
+
+function actualizarVisibilidadReproductivo() {
+  const tipo = document.getElementById('a-tipo').value;
+  const sexo = document.getElementById('a-sexo').value;
+  const grupo = document.getElementById('grupo-estado-reproductivo');
+  grupo.style.display = (tipo === 'equino' && sexo === 'macho') ? 'flex' : 'none';
 }
 
 // — FOTO DEL ANIMAL —
@@ -602,6 +562,8 @@ function guardarAnimal() {
     procedencia: document.getElementById('a-procedencia').value,
     potrero:       document.getElementById('a-potrero').value.trim(),
     potreroFecha:  document.getElementById('a-potrero-fecha').value,
+    estadoReproductivo: (tipo === 'equino' && document.getElementById('a-sexo').value === 'macho')
+      ? document.getElementById('a-estado-reproductivo').value : null,
     madre:       document.getElementById('a-madre').value,
     padre:       document.getElementById('a-padre').value,
     notas:       document.getElementById('a-notas').value,
@@ -633,6 +595,7 @@ function editarAnimal(id) {
   document.getElementById('a-estado').value      = a.estado;
   document.getElementById('a-potrero').value       = a.potrero || '';
   document.getElementById('a-potrero-fecha').value = a.potreroFecha || '';
+  document.getElementById('a-estado-reproductivo').value = a.estadoReproductivo || 'entero';
   document.getElementById('a-madre').value       = a.madre || '';
   document.getElementById('a-padre').value       = a.padre || '';
   document.getElementById('a-notas').value       = a.notas || '';
@@ -641,6 +604,7 @@ function editarAnimal(id) {
   actualizarPreviewFoto(a.foto || null);
   idAnimalEnEdicion = id;
   abrirModal('modal-animal');
+  actualizarVisibilidadReproductivo();
 }
 
 function eliminarAnimal(id) {
@@ -650,6 +614,7 @@ function eliminarAnimal(id) {
   db.reproductivo = db.reproductivo.filter(function(r) { return r.animalId !== id; });
   db.salud        = db.salud.filter(function(r) { return r.animalId !== id; });
   db.carne        = db.carne.filter(function(r) { return r.animalId !== id; });
+  db.servicios    = db.servicios.filter(function(r) { return r.sementalId !== id; });
   guardarDB();
   renderTablaAnimales(); renderDashboard(); renderInventario();
 }
@@ -663,6 +628,7 @@ function eliminarCompleto(id) {
   db.reproductivo = db.reproductivo.filter(function(r) { return r.animalId !== id; });
   db.salud        = db.salud.filter(function(r) { return r.animalId !== id; });
   db.carne        = db.carne.filter(function(r) { return r.animalId !== id; });
+  db.servicios    = db.servicios.filter(function(r) { return r.sementalId !== id; });
   guardarDB();
   renderTablaAnimales(); renderDashboard(); renderLeche(); renderReproduccion(); renderSalud(); renderInventario(); renderCarne();
 }
@@ -740,6 +706,74 @@ function eliminarRepro(id) {
   renderDashboard();
 }
 
+// — SERVICIOS DE MONTA (caballos enteros) —
+function guardarServicio() {
+  const sementalId = document.getElementById('sv-semental').value;
+  const yegua      = document.getElementById('sv-yegua').value.trim();
+  const dueno      = document.getElementById('sv-dueno').value.trim();
+  const fecha      = document.getElementById('sv-fecha').value;
+  const valor      = document.getElementById('sv-valor').value;
+  if (!sementalId || !yegua || !dueno || !fecha || !valor) { alert('⚠️ Completa los campos obligatorios'); return; }
+  const semental = db.animales.find(function(a) { return a.id === sementalId; });
+  const servicio = {
+    id: nuevoId('SV'),
+    sementalId,
+    sementalNombre: semental ? semental.nombre : '',
+    yegua, dueno, fecha,
+    valor: Number(valor),
+    estado: document.getElementById('sv-estado').value,
+    notas: document.getElementById('sv-notas').value,
+    finanzaId: null,
+  };
+  if (servicio.estado === 'pagado') {
+    registrarIngresoServicio(servicio);
+  }
+  db.servicios.push(servicio);
+  guardarDB();
+  cerrarModal('modal-servicio');
+  renderReproduccion();
+  renderFinanzas();
+  ['sv-yegua','sv-dueno','sv-valor','sv-notas'].forEach(function(id) { document.getElementById(id).value = ''; });
+}
+
+function registrarIngresoServicio(servicio) {
+  const fin = {
+    id: nuevoId('F'),
+    fecha: servicio.fecha,
+    tipo: 'ingreso',
+    cat: 'servicio_monta',
+    desc: 'Servicio de monta: ' + servicio.sementalNombre + ' × yegua "' + servicio.yegua + '"',
+    valor: servicio.valor,
+    extra: servicio.dueno,
+    origen: 'servicio',
+    origenId: servicio.id,
+  };
+  db.finanzas.push(fin);
+  servicio.finanzaId = fin.id;
+}
+
+function marcarServicioPagado(id) {
+  const sv = db.servicios.find(function(x) { return x.id === id; });
+  if (!sv || sv.estado === 'pagado') return;
+  sv.estado = 'pagado';
+  registrarIngresoServicio(sv);
+  guardarDB();
+  renderReproduccion();
+  renderFinanzas();
+}
+
+function eliminarServicio(id) {
+  if (!confirm('¿Eliminar este servicio de monta?')) return;
+  const sv = db.servicios.find(function(x) { return x.id === id; });
+  if (sv && sv.finanzaId) {
+    db.finanzas = db.finanzas.filter(function(f) { return f.id !== sv.finanzaId; });
+  }
+  db.servicios = db.servicios.filter(function(x) { return x.id !== id; });
+  guardarDB();
+  renderReproduccion();
+  renderFinanzas();
+}
+
 // — SALUD —
 function guardarSalud() {
   const animalId = document.getElementById('s-animal').value;
@@ -795,18 +829,32 @@ function guardarMedicamento() {
   const nombre   = document.getElementById('m-nombre').value.trim();
   const cantidad = document.getElementById('m-cantidad').value;
   if (!nombre || !cantidad) { alert('⚠️ Completa nombre y cantidad'); return; }
-  db.medicamentos.push({
+  const costo = Number(document.getElementById('m-costo').value) || 0;
+  const med = {
     id: nuevoId('M'),
     nombre,
     cantidad:    Number(cantidad),
     unidad:      document.getElementById('m-unidad').value,
     vencimiento: document.getElementById('m-vencimiento').value,
+    costo,
     notas:       document.getElementById('m-notas').value,
-  });
+    finanzaId:   null,
+  };
+  if (costo > 0) {
+    const fin = {
+      id: nuevoId('F'), fecha: hoyISO(), tipo: 'gasto', cat: 'medicamentos',
+      desc: 'Compra de medicamento: ' + nombre, valor: costo, extra: '',
+      origen: 'medicamento', origenId: med.id,
+    };
+    db.finanzas.push(fin);
+    med.finanzaId = fin.id;
+  }
+  db.medicamentos.push(med);
   guardarDB();
   cerrarModal('modal-medicamento');
   renderInventario();
-  ['m-nombre','m-cantidad','m-vencimiento','m-notas'].forEach(function(id) { document.getElementById(id).value = ''; });
+  renderFinanzas();
+  ['m-nombre','m-cantidad','m-vencimiento','m-costo','m-notas'].forEach(function(id) { document.getElementById(id).value = ''; });
 }
 
 function editarMedicamento(id) {
@@ -822,10 +870,15 @@ function editarMedicamento(id) {
 }
 
 function eliminarMedicamento(id) {
-  if (!confirm('¿Eliminar este medicamento del inventario?')) return;
+  if (!confirm('¿Eliminar este medicamento del inventario? Esto también eliminará el gasto asociado en Finanzas, si lo hay.')) return;
+  const m = db.medicamentos.find(function(x) { return x.id === id; });
+  if (m && m.finanzaId) {
+    db.finanzas = db.finanzas.filter(function(f) { return f.id !== m.finanzaId; });
+  }
   db.medicamentos = db.medicamentos.filter(function(m) { return m.id !== id; });
   guardarDB();
   renderInventario();
+  renderFinanzas();
 }
 
 // — ALIMENTACIÓN —
@@ -833,7 +886,8 @@ function guardarAlimento() {
   const producto = document.getElementById('al-producto').value.trim();
   const cantidad = document.getElementById('al-cantidad').value;
   if (!producto || !cantidad) { alert('⚠️ Completa producto y cantidad'); return; }
-  db.alimentacion.push({
+  const costo = Number(document.getElementById('al-costo').value) || 0;
+  const alim = {
     id: nuevoId('A'),
     producto,
     categoria:     document.getElementById('al-categoria').value,
@@ -842,22 +896,39 @@ function guardarAlimento() {
     unidad:        document.getElementById('al-unidad').value,
     kg:            Number(document.getElementById('al-kg').value) || 1,
     consumoDiario: Number(document.getElementById('al-consumo').value) || 0,
-    costo:         Number(document.getElementById('al-costo').value) || 0,
+    costo,
     notas:         document.getElementById('al-notas').value,
-  });
+    finanzaId:     null,
+  };
+  if (costo > 0) {
+    const fin = {
+      id: nuevoId('F'), fecha: alim.fecha || hoyISO(), tipo: 'gasto', cat: 'alimentacion',
+      desc: 'Compra de alimento/insumo: ' + producto, valor: costo, extra: '',
+      origen: 'alimentacion', origenId: alim.id,
+    };
+    db.finanzas.push(fin);
+    alim.finanzaId = fin.id;
+  }
+  db.alimentacion.push(alim);
   guardarDB();
   cerrarModal('modal-alimento');
   renderAlimentacion();
+  renderFinanzas();
   ['al-producto','al-cantidad','al-kg','al-consumo','al-costo','al-notas'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
 }
 
 function eliminarAlimento(id) {
-  if (!confirm('¿Eliminar este registro de alimento?')) return;
+  if (!confirm('¿Eliminar este registro de alimento? Esto también eliminará el gasto asociado en Finanzas, si lo hay.')) return;
+  const a = db.alimentacion.find(function(r) { return r.id === id; });
+  if (a && a.finanzaId) {
+    db.finanzas = db.finanzas.filter(function(f) { return f.id !== a.finanzaId; });
+  }
   db.alimentacion = db.alimentacion.filter(function(r) { return r.id !== id; });
   guardarDB();
   renderAlimentacion();
+  renderFinanzas();
 }
 
 // — FINANZAS —
@@ -892,6 +963,8 @@ function guardarVenta() {
 }
 
 function eliminarFinanza(id) {
+  const f = db.finanzas.find(function(r) { return r.id === id; });
+  if (f && f.origen) { alert('⚠️ Este movimiento se generó automáticamente. Elimínalo desde su sección original (' + f.origen + ') para mantener todo sincronizado.'); return; }
   if (!confirm('¿Eliminar esta transacción?')) return;
   db.finanzas = db.finanzas.filter(function(r) { return r.id !== id; });
   guardarDB();
@@ -907,32 +980,60 @@ function guardarPesaje() {
   const peso     = document.getElementById('p-peso').value;
   if (!animalId || !fecha || !peso) { alert('⚠️ Completa animal, fecha y peso'); return; }
 
-  const pesoN = Number(peso);
+  const pesoN     = Number(peso);
+  const destino   = document.getElementById('p-destino').value;
+  const precioKg  = Number(document.getElementById('p-precio').value) || 0;
+  const animal    = db.animales.find(function(a) { return a.id === animalId; });
 
   // Actualizar peso actual del animal también
-  const animal = db.animales.find(function(a) { return a.id === animalId; });
   if (animal) animal.peso = pesoN;
 
-  db.carne.push({
+  const pesajeObj = {
     id:         nuevoId('C'),
     animalId,
     fecha,
     peso:       pesoN,
-    destino:    document.getElementById('p-destino').value,
-    precioKg:   Number(document.getElementById('p-precio').value) || 0,
+    destino,
+    precioKg,
     obs:        document.getElementById('p-obs').value,
-  });
+    finanzaId:  null,
+  };
+
+  // Si es venta o faena y hay precio por kg, generar ingreso automático
+  const esVentaConPrecio = (destino === 'venta' || destino === 'faena' || destino === 'subasta') && precioKg > 0;
+  if (esVentaConPrecio) {
+    const totalVenta = Math.round(pesoN * precioKg);
+    const fin = {
+      id: nuevoId('F'), fecha, tipo: 'ingreso', cat: 'venta_animal',
+      desc: 'Venta/faena de ' + (animal ? animal.nombre : animalId) + ' (' + pesoN + ' kg)',
+      valor: totalVenta, extra: '',
+      origen: 'carne', origenId: pesajeObj.id,
+    };
+    db.finanzas.push(fin);
+    pesajeObj.finanzaId = fin.id;
+    // Si fue venta o faena, el animal pasa a estado "vendido" automáticamente
+    if (animal && animal.estado === 'activo') animal.estado = 'vendido';
+  }
+
+  db.carne.push(pesajeObj);
   guardarDB();
   cerrarModal('modal-pesaje');
   renderCarne();
+  renderFinanzas();
+  renderTablaAnimales();
   ['p-peso','p-precio','p-obs'].forEach(function(id) { document.getElementById(id).value = ''; });
 }
 
 function eliminarPesaje(id) {
-  if (!confirm('¿Eliminar este registro de pesaje?')) return;
+  if (!confirm('¿Eliminar este registro de pesaje? Esto también eliminará el ingreso asociado en Finanzas, si lo hay.')) return;
+  const c = db.carne.find(function(r) { return r.id === id; });
+  if (c && c.finanzaId) {
+    db.finanzas = db.finanzas.filter(function(f) { return f.id !== c.finanzaId; });
+  }
   db.carne = db.carne.filter(function(r) { return r.id !== id; });
   guardarDB();
   renderCarne();
+  renderFinanzas();
 }
 
 // ============================================================
@@ -1219,6 +1320,21 @@ function renderReproduccion() {
         '<td><button class="btn btn-sm btn-rojo" onclick="eliminarRepro(\'' + r.id + '\')">🗑️</button></td>' +
         '</tr>';
     }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin eventos reproductivos</td></tr>';
+
+  document.getElementById('tbody-servicios').innerHTML = db.servicios.slice().reverse().map(function(s) {
+    return '<tr>' +
+      '<td><strong>' + s.sementalNombre + '</strong></td>' +
+      '<td>' + s.yegua + '</td>' +
+      '<td>' + s.dueno + '</td>' +
+      '<td>' + fmt(s.fecha) + '</td>' +
+      '<td>' + moneda(s.valor) + '</td>' +
+      '<td>' + (s.estado === 'pagado'
+        ? '<span class="badge badge-verde">✅ Pagado</span>'
+        : '<button class="btn btn-sm btn-tierra" onclick="marcarServicioPagado(\'' + s.id + '\')">⏳ Marcar pagado</button>') + '</td>' +
+      '<td style="color:var(--gris-texto)">' + (s.notas || '-') + '</td>' +
+      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarServicio(\'' + s.id + '\')">🗑️</button></td>' +
+      '</tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin servicios registrados</td></tr>';
 }
 
 // ============================================================
@@ -1343,7 +1459,11 @@ function renderAlimentacion() {
 // RENDER — FINANZAS
 // ============================================================
 function renderFinanzas() {
-  const cats    = { alimentacion: '🌾 Alimentación', salud: '💉 Salud', infraestructura: '🏗️ Infraestructura', mano_obra: '👷 Mano de obra', compra_animal: '🐄 Compra animal', otro: '📌 Otro' };
+  const cats = {
+    alimentacion: '🌾 Alimentación', salud: '💉 Salud', medicamentos: '💊 Medicamentos',
+    infraestructura: '🏗️ Infraestructura', mano_obra: '👷 Mano de obra', compra_animal: '🐄 Compra animal',
+    venta_animal: '🐄 Venta de animal', servicio_monta: '🐎 Servicio de monta', otro: '📌 Otro'
+  };
   const gastos  = db.finanzas.filter(function(f) { return f.tipo === 'gasto'; });
   const ingresos= db.finanzas.filter(function(f) { return f.tipo === 'ingreso'; });
   const tG      = gastos.reduce(function(s, f) { return s + f.valor; }, 0);
@@ -1367,13 +1487,17 @@ function renderFinanzas() {
         (f.tipo === 'ingreso' ? '+' : '−') + moneda(f.valor) + '</strong></div>';
   }).join('') || '<p style="color:var(--gris-texto);font-size:0.85rem">Sin transacciones</p>';
   document.getElementById('tbody-finanzas').innerHTML = db.finanzas.slice().sort(function(a, b) { return b.fecha < a.fecha ? -1 : 1; }).map(function(f) {
+    const esAuto = !!f.origen;
     return '<tr>' +
       '<td>' + fmt(f.fecha) + '</td>' +
       '<td><span class="badge ' + (f.tipo === 'ingreso' ? 'badge-verde' : 'badge-rojo') + '">' + (f.tipo === 'ingreso' ? '📈 Ingreso' : '📉 Gasto') + '</span></td>' +
       '<td><span class="badge badge-gris">' + (cats[f.cat] || f.cat) + '</span></td>' +
-      '<td>' + f.desc + (f.extra ? '<small style="color:var(--gris-texto)"> · ' + f.extra + '</small>' : '') + '</td>' +
+      '<td>' + f.desc + (f.extra ? '<small style="color:var(--gris-texto)"> · ' + f.extra + '</small>' : '') +
+        (esAuto ? '<br><small style="color:var(--gris-texto);font-style:italic">↳ Generado automáticamente desde su sección</small>' : '') + '</td>' +
       '<td><strong style="color:' + (f.tipo === 'ingreso' ? 'var(--verde-medio)' : 'var(--rojo)') + '">' + (f.tipo === 'ingreso' ? '+' : '−') + moneda(f.valor) + '</strong></td>' +
-      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarFinanza(\'' + f.id + '\')">🗑️</button></td>' +
+      '<td>' + (esAuto
+        ? '<span title="Elimina el registro original en su sección para quitar este movimiento" style="color:var(--gris-texto);font-size:0.78rem">🔒 Automático</span>'
+        : '<button class="btn btn-sm btn-rojo" onclick="eliminarFinanza(\'' + f.id + '\')">🗑️</button>') + '</td>' +
       '</tr>';
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
 }
@@ -1574,6 +1698,103 @@ function renderInventarioMedicamentos() {
         '<button class="btn btn-sm btn-rojo" onclick="eliminarMedicamento(\'' + m.id + '\')">🗑️</button>' +
       '</td></tr>';
   }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin medicamentos registrados</td></tr>';
+}
+
+// ============================================================
+// CALENDARIO DE LA FINCA
+// ============================================================
+let calMesActual = new Date().getMonth();
+let calAnioActual = new Date().getFullYear();
+const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+function cambiarMesCalendario(delta) {
+  calMesActual += delta;
+  if (calMesActual > 11) { calMesActual = 0; calAnioActual++; }
+  if (calMesActual < 0)  { calMesActual = 11; calAnioActual--; }
+  renderCalendario();
+}
+
+function recolectarEventosCalendario() {
+  // Cada evento: { fecha (YYYY-MM-DD), tipo: 'salud'|'repro'|'med'|'servicio', texto }
+  const eventos = [];
+  const activos = db.animales.filter(function(a) { return a.estado === 'activo'; });
+  const porId = {};
+  db.animales.forEach(function(a) { porId[a.id] = a; });
+
+  // Próximas fechas de salud (vacunas, desparasitaciones, etc.)
+  db.salud.forEach(function(s) {
+    if (!s.proxima) return;
+    const a = porId[s.animalId];
+    eventos.push({ fecha: s.proxima, tipo: 'salud', texto: '💉 ' + (s.tipo || 'Evento') + ': ' + (a ? a.nombre : s.animalId) });
+  });
+
+  // Partos estimados
+  db.reproductivo.forEach(function(r) {
+    if (!r.fechaParto || r.gestante !== 'si') return;
+    const a = porId[r.animalId];
+    eventos.push({ fecha: r.fechaParto, tipo: 'repro', texto: '🤰 Parto estimado: ' + (a ? a.nombre : r.animalId) });
+  });
+
+  // Vencimientos de medicamentos
+  db.medicamentos.forEach(function(m) {
+    if (!m.vencimiento) return;
+    eventos.push({ fecha: m.vencimiento, tipo: 'med', texto: '💊 Vence: ' + m.nombre });
+  });
+
+  // Servicios de monta (fecha del servicio)
+  db.servicios.forEach(function(s) {
+    eventos.push({ fecha: s.fecha, tipo: 'servicio', texto: '🐎 Servicio: ' + s.sementalNombre + ' × "' + s.yegua + '"' + (s.estado === 'pendiente' ? ' (pago pendiente)' : '') });
+  });
+
+  return eventos;
+}
+
+function renderCalendario() {
+  const eventos = recolectarEventosCalendario();
+  document.getElementById('cal-titulo-mes').textContent = MESES_NOMBRE[calMesActual] + ' ' + calAnioActual;
+
+  document.getElementById('cal-leyenda').innerHTML =
+    '<span class="cal-leyenda-item"><span class="cal-leyenda-dot" style="background:var(--rojo)"></span> Salud / vacunas</span>' +
+    '<span class="cal-leyenda-item"><span class="cal-leyenda-dot" style="background:#9D4EDD"></span> Partos estimados</span>' +
+    '<span class="cal-leyenda-item"><span class="cal-leyenda-dot" style="background:#0096C7"></span> Vencimiento medicamentos</span>' +
+    '<span class="cal-leyenda-item"><span class="cal-leyenda-dot" style="background:var(--tierra)"></span> Servicios de monta</span>';
+
+  const primerDia    = new Date(calAnioActual, calMesActual, 1);
+  const diasEnMes     = new Date(calAnioActual, calMesActual + 1, 0).getDate();
+  const offsetInicial = primerDia.getDay(); // 0 = domingo
+  const hoy = hoyISO();
+
+  const nombresDias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  let html = nombresDias.map(function(n) { return '<div class="cal-dia-nombre">' + n + '</div>'; }).join('');
+
+  for (let i = 0; i < offsetInicial; i++) html += '<div class="cal-celda vacia"></div>';
+
+  for (let dia = 1; dia <= diasEnMes; dia++) {
+    const fechaStr = calAnioActual + '-' + String(calMesActual + 1).padStart(2, '0') + '-' + String(dia).padStart(2, '0');
+    const evDia = eventos.filter(function(e) { return e.fecha === fechaStr; });
+    const esHoy = fechaStr === hoy;
+    html += '<div class="cal-celda' + (esHoy ? ' hoy' : '') + '">' +
+      '<div class="cal-num">' + dia + '</div>' +
+      evDia.slice(0, 3).map(function(e) {
+        return '<span class="cal-evento ' + e.tipo + '" title="' + e.texto.replace(/"/g, '') + '">' + e.texto + '</span>';
+      }).join('') +
+      (evDia.length > 3 ? '<span style="font-size:0.6rem;color:var(--gris-texto)">+' + (evDia.length - 3) + ' más</span>' : '') +
+      '</div>';
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+
+  // Lista de próximas novedades (orden cronológico, desde hoy en adelante, máx 20)
+  const proximos = eventos
+    .filter(function(e) { return e.fecha >= hoy; })
+    .sort(function(a, b) { return a.fecha < b.fecha ? -1 : 1; })
+    .slice(0, 20);
+  document.getElementById('cal-lista-eventos').innerHTML = proximos.map(function(e) {
+    const d = diasPara(e.fecha);
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--gris-borde);font-size:0.83rem">' +
+      '<span>' + e.texto + '</span>' +
+      '<span class="badge ' + (d <= 7 ? 'badge-amarillo' : 'badge-gris') + '">' + fmt(e.fecha) + (d >= 0 ? ' · en ' + d + 'd' : '') + '</span>' +
+      '</div>';
+  }).join('') || '<p style="color:var(--gris-texto);font-size:0.85rem">No hay novedades próximas registradas.</p>';
 }
 
 // ============================================================
