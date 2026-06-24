@@ -1,0 +1,39 @@
+{
+  "name": "Mi Finca — Gestión Ganadera",
+  "short_name": "Mi Finca",
+  "description": "Control de bovinos, equinos, salud, reproducción y finanzas de tu finca",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1B4332",
+  "theme_color": "#1B4332",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mis animales",
+      "url": "./index.html",
+      "description": "Ver todos los animales"
+    },
+    {
+      "name": "Registrar evento médico",
+      "url": "./index.html",
+      "description": "Registrar vacuna o tratamiento"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["productivity", "agriculture"]
+}

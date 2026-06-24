@@ -2,8 +2,16 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Mi Finca — Gestión Ganadera</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1B4332">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mi Finca">
+<link rel="apple-touch-icon" href="icon-192.png">
 
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -108,6 +116,9 @@
       </div>
       <div class="nav-item" onclick="mostrarPagina('inventario')">
         <span class="icon">📦</span> Inventario
+      </div>
+      <div class="nav-item" onclick="mostrarPagina('protocolos')">
+        <span class="icon">🛡️</span> Protocolos sanitarios
       </div>
     </nav>
     <div class="sync-indicator">
@@ -335,6 +346,18 @@
         <div><h2>💉 Salud y vacunas</h2><p>Historial médico y alertas</p></div>
         <button class="btn btn-verde" onclick="abrirModal('modal-salud')">+ Registrar evento médico</button>
       </div>
+
+      <!-- Pendientes de protocolo -->
+      <div class="card" style="border-left:4px solid var(--tierra);margin-bottom:1rem" id="card-pendientes-protocolo">
+        <div class="card-header">
+          <h3>🛡️ Pendientes de protocolo</h3>
+          <span style="font-size:0.78rem;color:var(--gris-texto)">Eventos próximos según los protocolos activos</span>
+        </div>
+        <div class="card-body" id="pendientes-protocolo-body">
+          <p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin eventos pendientes de protocolo</p>
+        </div>
+      </div>
+
       <div class="card" style="border-left:4px solid var(--rojo)">
         <div class="card-header"><h3>⚠️ Alertas activas</h3></div>
         <div class="card-body" id="alertas-salud-body"><p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin alertas</p></div>
@@ -342,7 +365,7 @@
       <div class="card">
         <div class="card-header"><h3>Historial veterinario completo</h3></div>
         <div class="tabla-wrap">
-          <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Fecha</th><th>Próxima</th><th>Veterinario</th><th>Acción</th></tr></thead>
+          <table><thead><tr><th>Animal</th><th>Tipo</th><th>Descripción</th><th>Medicamento</th><th>Fecha</th><th>Próxima</th><th>Vet.</th><th>Acción</th></tr></thead>
           <tbody id="tbody-salud"></tbody></table>
         </div>
       </div>
@@ -432,11 +455,72 @@
       </div>
     </div>
 
+    <!-- PROTOCOLOS SANITARIOS -->
+    <div class="page" id="page-protocolos">
+      <div class="section-title">
+        <div><h2>🛡️ Protocolos sanitarios</h2><p>Define esquemas de vacunación y manejo sanitario para aplicar automáticamente a tus animales</p></div>
+        <button class="btn btn-verde" onclick="abrirModal('modal-protocolo')">+ Crear protocolo</button>
+      </div>
+
+      <div class="card" style="border-left:4px solid var(--verde-medio)">
+        <div class="card-header"><h3>¿Cómo funciona?</h3></div>
+        <div class="card-body" style="font-size:0.83rem;color:var(--gris-texto)">
+          <p>Cada protocolo es un <strong>listado de eventos sanitarios con su intervalo en días</strong> (vacunas, desparasitaciones, vitaminas, herrajes). Al registrar un animal nuevo, el sistema te preguntará si quieres aplicar un protocolo — elige la fecha de inicio y se crearán todos los recordatorios automáticamente en el módulo de <strong>Salud</strong> y en el <strong>Calendario</strong>.</p>
+          <p style="margin-top:6px">Los protocolos marcados con <span class="badge badge-azul">ICA</span> son los estándar del Instituto Colombiano Agropecuario. Puedes editarlos o crear los tuyos propios.</p>
+        </div>
+      </div>
+
+      <div id="lista-protocolos" style="margin-top:1.2rem"></div>
+    </div>
+
   </div><!-- fin #main -->
 </div><!-- fin #app-principal -->
 
 
 <!-- ==================== MODALES ==================== -->
+
+<!-- Modal: Crear / editar protocolo -->
+<div class="modal-overlay" id="modal-protocolo">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header"><h3>🛡️ Protocolo sanitario</h3><button class="modal-close" onclick="cerrarModal('modal-protocolo')">×</button></div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group form-full"><label>Nombre del protocolo <span class="req">*</span></label><input type="text" id="prot-nombre" placeholder="Ej: Protocolo terneros recién nacidos"></div>
+        <div class="form-group"><label>Aplica para</label><select id="prot-tipo"><option value="bovino">🐄 Bovinos</option><option value="equino">🐎 Equinos</option><option value="ambos">Ambos</option></select></div>
+      </div>
+      <div style="margin-top:1rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+          <label style="font-weight:600;font-size:0.85rem">Eventos del protocolo</label>
+          <button type="button" class="btn btn-sm btn-outline" onclick="agregarFilaEventoProtocolo()">+ Agregar evento</button>
+        </div>
+        <div id="prot-eventos-lista"></div>
+      </div>
+      <div class="form-actions" style="margin-top:1.2rem">
+        <button class="btn btn-outline" onclick="cerrarModal('modal-protocolo')">Cancelar</button>
+        <button class="btn btn-verde" onclick="guardarProtocolo()">💾 Guardar protocolo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Aplicar protocolo a un animal -->
+<div class="modal-overlay" id="modal-aplicar-protocolo">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header"><h3>🛡️ Aplicar protocolo sanitario</h3><button class="modal-close" onclick="cerrarModal('modal-aplicar-protocolo')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem;color:var(--gris-texto);margin-bottom:1rem">Se crearán recordatorios automáticos en Salud y en el Calendario para este animal. Elige el protocolo y la fecha desde la cual empezar a contar.</p>
+      <div class="form-grid">
+        <div class="form-group form-full"><label>Protocolo <span class="req">*</span></label><select id="ap-protocolo" onchange="previsualizarProtocolo()"></select></div>
+        <div class="form-group form-full"><label>Fecha de inicio <span class="req">*</span></label><input type="date" id="ap-fecha-inicio"></div>
+        <div id="ap-preview" style="margin-top:0.5rem"></div>
+        <div class="form-actions" style="margin-top:0.5rem">
+          <button class="btn btn-outline" onclick="cerrarModal('modal-aplicar-protocolo');guardarAnimalSinProtocolo()">Omitir — sin protocolo</button>
+          <button class="btn btn-verde" onclick="confirmarAplicarProtocolo()">✅ Aplicar y guardar animal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: Configurar finca -->
 <div class="modal-overlay" id="modal-config">
@@ -491,6 +575,8 @@
         <div class="form-group"><label>Estado</label><select id="a-estado"><option value="activo">Activo</option><option value="vendido">Vendido</option><option value="muerto">Muerto / Baja</option></select></div>
         <div class="form-group"><label>Potrero / Ubicación actual</label><input type="text" id="a-potrero" placeholder="Ej: Potrero 3"></div>
         <div class="form-group"><label>Desde cuándo está ahí</label><input type="date" id="a-potrero-fecha"></div>
+        <div class="form-group"><label>🏷️ Arete / Código SINIGAN</label><input type="text" id="a-arete" placeholder="Ej: 0610001234567890"></div>
+        <div class="form-group"><label>🔥 Marca en candela / Hierro</label><input type="text" id="a-marca-candela" placeholder="Ej: LH en paleta izquierda"></div>
         <div class="form-group"><label>ID Madre (opcional)</label><input type="text" id="a-madre" placeholder="Ej: BOV-001"></div>
         <div class="form-group"><label>ID Padre (opcional)</label><input type="text" id="a-padre" placeholder="Ej: BOV-003"></div>
         <div class="form-group form-full"><label>Notas</label><textarea id="a-notas" rows="2"></textarea></div>
@@ -614,22 +700,65 @@
   </div>
 </div>
 <div class="modal-overlay" id="modal-salud">
-  <div class="modal" style="max-width:600px">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header"><h3>💉 Registrar evento médico</h3><button class="modal-close" onclick="cerrarModal('modal-salud')">×</button></div>
     <div class="modal-body">
+
+      <!-- Panel de accesos rápidos por protocolo -->
+      <div id="s-panel-protocolos" style="display:none;margin-bottom:1rem">
+        <p style="font-size:0.78rem;font-weight:700;color:var(--verde-oscuro);margin-bottom:6px">⚡ ACCESOS RÁPIDOS — eventos del protocolo de este animal</p>
+        <div id="s-botones-protocolo" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div style="height:1px;background:var(--gris-borde);margin:10px 0"></div>
+      </div>
+
       <div class="form-grid">
-        <div class="form-group"><label>Animal <span class="req">*</span></label><select id="s-animal"></select></div>
-        <div class="form-group"><label>Tipo</label><select id="s-tipo"><option value="vacuna">💉 Vacuna</option><option value="desparasitacion">🪱 Desparasitación</option><option value="herraje">🔩 Herraje</option><option value="odontologia">🦷 Odontología</option><option value="vitamina">💊 Vitaminas</option><option value="otro">🏥 Otro</option></select></div>
-        <div class="form-group"><label>Fecha del evento <span class="req">*</span></label><input type="date" id="s-fecha"></div>
-        <div class="form-group"><label>Próxima fecha (para alerta)</label><input type="date" id="s-proxima"></div>
-        <div class="form-group"><label>Medicamento (del inventario)</label>
-          <select id="s-medicamento-inv" onchange="seleccionarMedicamentoSalud(this.value)"><option value="">— Ninguno / escribir manualmente —</option></select>
+        <div class="form-group form-full">
+          <label>Animal <span class="req">*</span></label>
+          <select id="s-animal" onchange="cargarProtocolosAnimal(this.value)"></select>
         </div>
-        <div class="form-group"><label>Medicamento (nombre)</label><input type="text" id="s-medicamento"></div>
-        <div class="form-group"><label>Dosis</label><input type="text" id="s-dosis" placeholder="Ej: 5ml"></div>
-        <div class="form-group"><label>Cantidad usada del inventario</label><input type="number" step="0.01" id="s-cantidad-usada" placeholder="Ej: 5"></div>
-        <div class="form-group form-full"><label>Descripción</label><input type="text" id="s-desc"></div>
-        <div class="form-group form-full"><label>Veterinario</label><input type="text" id="s-vet"></div>
+        <div class="form-group"><label>Tipo</label>
+          <select id="s-tipo">
+            <option value="vacuna">💉 Vacuna</option>
+            <option value="desparasitacion">🪱 Desparasitación</option>
+            <option value="herraje">🔩 Herraje</option>
+            <option value="odontologia">🦷 Odontología</option>
+            <option value="vitamina">💊 Vitaminas</option>
+            <option value="otro">🏥 Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Descripción del evento</label>
+          <input type="text" id="s-desc" placeholder="Ej: Garrapaticida Dectomax">
+        </div>
+        <div class="form-group">
+          <label>Fecha del evento <span class="req">*</span></label>
+          <input type="date" id="s-fecha" onchange="recalcularProximaDesdeIntervalo()">
+        </div>
+        <div class="form-group">
+          <label>Próxima fecha
+            <span id="s-proxima-label" style="font-size:0.72rem;color:var(--verde-medio);margin-left:4px"></span>
+          </label>
+          <input type="date" id="s-proxima">
+        </div>
+        <div class="form-group"><label>Medicamento (del inventario)</label>
+          <select id="s-medicamento-inv" onchange="seleccionarMedicamentoSalud(this.value)">
+            <option value="">— Ninguno / escribir manualmente —</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Medicamento (nombre)</label>
+          <input type="text" id="s-medicamento">
+        </div>
+        <div class="form-group"><label>Dosis</label>
+          <input type="text" id="s-dosis" placeholder="Ej: 5ml">
+        </div>
+        <div class="form-group"><label>Cantidad usada del inventario</label>
+          <input type="number" step="0.01" id="s-cantidad-usada" placeholder="Ej: 5">
+        </div>
+        <div class="form-group form-full"><label>Veterinario</label>
+          <input type="text" id="s-vet">
+        </div>
+        <!-- Campo oculto: protocolo e intervalo del evento seleccionado -->
+        <input type="hidden" id="s-protocolo-id">
+        <input type="hidden" id="s-intervalo-dias">
         <div class="form-actions">
           <button class="btn btn-outline" onclick="cerrarModal('modal-salud')">Cancelar</button>
           <button class="btn btn-verde" onclick="guardarSalud()">💾 Guardar</button>
@@ -756,5 +885,16 @@
 
 <!-- JavaScript -->
 <script src="app.js"></script>
+
+<!-- Registro del Service Worker (PWA) -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(reg) { console.log('[PWA] Service worker registrado:', reg.scope); })
+      .catch(function(err) { console.log('[PWA] Error al registrar SW:', err); });
+  });
+}
+</script>
 </body>
 </html>

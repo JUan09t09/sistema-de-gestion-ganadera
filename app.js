@@ -31,7 +31,8 @@ let modoTab        = 'login';
 function crearDBVacia() {
   return {
     config: { nombre: 'Mi Finca', propietario: 'Administrador', lugar: '' },
-    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [], servicios: []
+    animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [], servicios: [],
+    protocolos: protocolosICA()
   };
 }
 
@@ -48,8 +49,36 @@ function normalizarDB(datos) {
     finanzas:     Array.isArray(seguro.finanzas)     ? seguro.finanzas     : [],
     carne:        Array.isArray(seguro.carne)        ? seguro.carne        : [],
     medicamentos: Array.isArray(seguro.medicamentos) ? seguro.medicamentos : [],
-    servicios:    Array.isArray(seguro.servicios)    ? seguro.servicios    : []
+    servicios:    Array.isArray(seguro.servicios)    ? seguro.servicios    : [],
+    protocolos:   Array.isArray(seguro.protocolos)   ? seguro.protocolos   : protocolosICA()
   };
+}
+
+// Protocolos ICA estándar iniciales
+function protocolosICA() {
+  return [
+    { id: 'P001', nombre: 'Bovino — Protocolo estándar ICA', tipo: 'bovino',
+      eventos: [
+        { nombre: 'Vacuna Fiebre Aftosa', tipo: 'vacuna', diasDesdeInicio: 0,    intervaloRepeticion: 180 },
+        { nombre: 'Vacuna Brucelosis (hembras)', tipo: 'vacuna', diasDesdeInicio: 30,   intervaloRepeticion: 365 },
+        { nombre: 'Garrapaticida (baño o inyectable)', tipo: 'desparasitacion', diasDesdeInicio: 0, intervaloRepeticion: 90 },
+        { nombre: 'Desparasitante interno', tipo: 'desparasitacion', diasDesdeInicio: 0, intervaloRepeticion: 120 },
+        { nombre: 'Vacuna Carbón sintomático', tipo: 'vacuna', diasDesdeInicio: 60,   intervaloRepeticion: 365 },
+        { nombre: 'Vacuna Septicemia hemorrágica', tipo: 'vacuna', diasDesdeInicio: 60, intervaloRepeticion: 365 },
+        { nombre: 'Vitaminas ADE', tipo: 'vitamina', diasDesdeInicio: 0, intervaloRepeticion: 90 },
+      ]
+    },
+    { id: 'P002', nombre: 'Equino — Protocolo estándar ICA', tipo: 'equino',
+      eventos: [
+        { nombre: 'Vacuna Encefalomielitis', tipo: 'vacuna', diasDesdeInicio: 0,   intervaloRepeticion: 180 },
+        { nombre: 'Vacuna Influenza equina', tipo: 'vacuna', diasDesdeInicio: 30,  intervaloRepeticion: 180 },
+        { nombre: 'Desparasitante interno (ivermectina)', tipo: 'desparasitacion', diasDesdeInicio: 0, intervaloRepeticion: 90 },
+        { nombre: 'Garrapaticida', tipo: 'desparasitacion', diasDesdeInicio: 0,  intervaloRepeticion: 90 },
+        { nombre: 'Vitaminas ADE', tipo: 'vitamina', diasDesdeInicio: 0, intervaloRepeticion: 90 },
+        { nombre: 'Herraje', tipo: 'herraje', diasDesdeInicio: 0, intervaloRepeticion: 60 },
+      ]
+    },
+  ];
 }
 
 function inicializarFirebase(config) {
@@ -157,6 +186,7 @@ function accionLogin() {
         return firestore.collection('usuarios').doc(cred.user.uid).set({
           config: { nombre: finca, propietario: nombre, lugar: '' },
           animales: [], leche: [], reproductivo: [], salud: [], alimentacion: [], finanzas: [], carne: [], medicamentos: [], servicios: [],
+          protocolos: protocolosICA(),
           creadoEn: firebase.firestore.FieldValue.serverTimestamp()
         });
       })
@@ -268,6 +298,7 @@ const TITULOS = {
   alimentacion: '🌾 Alimentación',
   finanzas:     '💰 Control financiero',
   inventario:   '📦 Inventario general',
+  protocolos:   '🛡️ Protocolos sanitarios',
 };
 
 function mostrarPagina(nombre) {
@@ -290,6 +321,7 @@ function mostrarPagina(nombre) {
   if (nombre === 'alimentacion') renderAlimentacion();
   if (nombre === 'finanzas')     renderFinanzas();
   if (nombre === 'inventario')   renderInventario();
+  if (nombre === 'protocolos')   renderProtocolos();
 }
 
 function toggleSidebar() {
@@ -363,7 +395,12 @@ function abrirModal(id) {
   if (id === 'modal-salud') { llenarSelectAnimales(); llenarSelectMedicamentos(); }
   if (id === 'modal-pesaje') llenarSelectAnimalesCarne();
   if (id === 'modal-servicio') llenarSelectSementales();
-  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha','m-vencimiento','sv-fecha'].forEach(function(fid) {
+  if (id === 'modal-protocolo' && _idProtocoloEnEdicion === null) {
+    document.getElementById('prot-nombre').value = '';
+    document.getElementById('prot-tipo').value   = 'bovino';
+    document.getElementById('prot-eventos-lista').innerHTML = '';
+  }
+  ['l-fecha','r-fecha','s-fecha','al-fecha','g-fecha','v-fecha','p-fecha','m-vencimiento','sv-fecha','ap-fecha-inicio'].forEach(function(fid) {
     const el = document.getElementById(fid);
     if (el && !el.value && fid !== 'm-vencimiento') el.value = hoyISO();
   });
@@ -462,7 +499,8 @@ function guardarConfig() {
 // ============================================================
 function resetFormularioAnimal() {
   idAnimalEnEdicion = null;
-  ['a-nombre','a-raza','a-nacimiento','a-peso','a-madre','a-padre','a-notas','a-potrero','a-potrero-fecha'].forEach(function(id) {
+  ['a-nombre','a-raza','a-nacimiento','a-peso','a-madre','a-padre','a-notas',
+   'a-potrero','a-potrero-fecha','a-arete','a-marca-candela'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('a-tipo').value        = 'bovino';
@@ -531,6 +569,9 @@ function quitarFotoAnimal() {
   actualizarPreviewFoto(null);
 }
 
+// Temporal para protocolo: guardamos el objeto animal en memoria mientras el modal de protocolo está abierto
+let _animalPendiente = null;
+
 function guardarAnimal() {
   const nombre = document.getElementById('a-nombre').value.trim();
   const nac    = document.getElementById('a-nacimiento').value;
@@ -538,7 +579,6 @@ function guardarAnimal() {
   if (!nombre || !nac || !peso) { alert('⚠️ Completa los campos obligatorios'); return; }
   const tipo   = document.getElementById('a-tipo').value;
 
-  // Determinar la foto: si hay una nueva, usarla; si se quitó, null; si no cambió, mantener la existente
   let foto = null;
   if (fotoTemporal === undefined) {
     if (idAnimalEnEdicion) {
@@ -546,7 +586,7 @@ function guardarAnimal() {
       foto = (existente && existente.foto) || null;
     }
   } else {
-    foto = fotoTemporal; // puede ser una nueva imagen o null si se quitó
+    foto = fotoTemporal;
   }
 
   const animal = {
@@ -564,21 +604,56 @@ function guardarAnimal() {
     potreroFecha:  document.getElementById('a-potrero-fecha').value,
     estadoReproductivo: (tipo === 'equino' && document.getElementById('a-sexo').value === 'macho')
       ? document.getElementById('a-estado-reproductivo').value : null,
+    arete:         document.getElementById('a-arete').value.trim(),
+    marcaCandela:  document.getElementById('a-marca-candela').value.trim(),
     madre:       document.getElementById('a-madre').value,
     padre:       document.getElementById('a-padre').value,
     notas:       document.getElementById('a-notas').value,
   };
+
+  // Si estamos editando, guardamos directamente sin preguntar protocolo
   if (idAnimalEnEdicion) {
     const i = db.animales.findIndex(function(a) { return a.id === idAnimalEnEdicion; });
     if (i !== -1) db.animales[i] = animal;
+    guardarDB();
+    cerrarModal('modal-animal');
+    renderTablaAnimales();
+    resetFormularioAnimal();
     alert('✅ Animal "' + nombre + '" actualizado');
-  } else {
-    db.animales.push(animal);
-    alert('✅ Animal "' + nombre + '" guardado · ID: ' + animal.id);
+    return;
   }
-  guardarDB();
+
+  // Animal nuevo: guardar temporal y preguntar por protocolo
+  _animalPendiente = animal;
   cerrarModal('modal-animal');
+
+  const protDisponibles = db.protocolos.filter(function(p) {
+    return p.tipo === tipo || p.tipo === 'ambos';
+  });
+
+  if (protDisponibles.length === 0) {
+    // No hay protocolos compatibles, guardar directo
+    guardarAnimalSinProtocolo();
+    return;
+  }
+
+  // Abrir modal de aplicar protocolo
+  const sel = document.getElementById('ap-protocolo');
+  sel.innerHTML = protDisponibles.map(function(p) {
+    return '<option value="' + p.id + '">' + p.nombre + '</option>';
+  }).join('');
+  document.getElementById('ap-fecha-inicio').value = hoyISO();
+  previsualizarProtocolo();
+  abrirModal('modal-aplicar-protocolo');
+}
+
+function guardarAnimalSinProtocolo() {
+  if (!_animalPendiente) return;
+  db.animales.push(_animalPendiente);
+  guardarDB();
   renderTablaAnimales();
+  alert('✅ Animal "' + _animalPendiente.nombre + '" guardado · ID: ' + _animalPendiente.id);
+  _animalPendiente = null;
   resetFormularioAnimal();
 }
 
@@ -596,6 +671,8 @@ function editarAnimal(id) {
   document.getElementById('a-potrero').value       = a.potrero || '';
   document.getElementById('a-potrero-fecha').value = a.potreroFecha || '';
   document.getElementById('a-estado-reproductivo').value = a.estadoReproductivo || 'entero';
+  document.getElementById('a-arete').value         = a.arete || '';
+  document.getElementById('a-marca-candela').value = a.marcaCandela || '';
   document.getElementById('a-madre').value       = a.madre || '';
   document.getElementById('a-padre').value       = a.padre || '';
   document.getElementById('a-notas').value       = a.notas || '';
@@ -779,9 +856,14 @@ function guardarSalud() {
   const animalId = document.getElementById('s-animal').value;
   const fecha    = document.getElementById('s-fecha').value;
   if (!animalId || !fecha) { alert('⚠️ Selecciona el animal y la fecha'); return; }
-  const medInvId     = document.getElementById('s-medicamento-inv').value;
-  const cantidadUsada = Number(document.getElementById('s-cantidad-usada').value) || 0;
 
+  const medInvId       = document.getElementById('s-medicamento-inv').value;
+  const cantidadUsada  = Number(document.getElementById('s-cantidad-usada').value) || 0;
+  const pendienteId    = document.getElementById('s-protocolo-id').value;  // ID del recordatorio pendiente (si aplica)
+  const intervaloDias  = Number(document.getElementById('s-intervalo-dias').value) || 0;
+  const desc           = document.getElementById('s-desc').value;
+
+  // Descontar inventario si aplica
   if (medInvId && cantidadUsada > 0) {
     const med = db.medicamentos.find(function(m) { return m.id === medInvId; });
     if (med) {
@@ -794,26 +876,87 @@ function guardarSalud() {
     }
   }
 
-  db.salud.push({
-    id: nuevoId('S'), animalId,
-    tipo:        document.getElementById('s-tipo').value,
-    desc:        document.getElementById('s-desc').value,
-    medicamento: document.getElementById('s-medicamento').value,
-    medicamentoInvId: medInvId || null,
-    cantidadUsada: cantidadUsada,
-    dosis:       document.getElementById('s-dosis').value,
-    fecha,
-    proxima:     document.getElementById('s-proxima').value,
-    veterinario: document.getElementById('s-vet').value,
-  });
+  const proxima = document.getElementById('s-proxima').value;
+
+  // Si viene de un botón de protocolo (pendienteId es el ID del recordatorio pendiente)
+  // lo marcamos como ejecutado y creamos el próximo recordatorio automáticamente
+  if (pendienteId) {
+    const pendiente = db.salud.find(function(s) { return s.id === pendienteId; });
+    if (pendiente) {
+      // Convertir el recordatorio pendiente en un evento real ejecutado hoy
+      pendiente.pendiente    = false;
+      pendiente.fecha        = fecha;
+      pendiente.medicamento  = document.getElementById('s-medicamento').value;
+      pendiente.medicamentoInvId = medInvId || null;
+      pendiente.cantidadUsada    = cantidadUsada;
+      pendiente.dosis        = document.getElementById('s-dosis').value;
+      pendiente.veterinario  = document.getElementById('s-vet').value;
+      pendiente.proxima      = proxima;
+
+      // Si tiene intervalo, crear el próximo recordatorio pendiente automáticamente
+      if (intervaloDias > 0 && proxima) {
+        db.salud.push({
+          id:              nuevoId('S'),
+          animalId,
+          tipo:            pendiente.tipo,
+          desc:            pendiente.desc || desc,
+          medicamento:     '', medicamentoInvId: null, cantidadUsada: 0, dosis: '',
+          fecha:           proxima,
+          proxima:         calcularProximaFecha(proxima, intervaloDias),
+          veterinario:     '',
+          origenProtocolo: pendiente.origenProtocolo,
+          eventoProtocolo: pendiente.eventoProtocolo,
+          intervaloDias,
+          pendiente:       true,
+        });
+      }
+    }
+  } else {
+    // Evento nuevo normal (no viene de un protocolo pendiente)
+    db.salud.push({
+      id: nuevoId('S'), animalId,
+      tipo:             document.getElementById('s-tipo').value,
+      desc,
+      medicamento:      document.getElementById('s-medicamento').value,
+      medicamentoInvId: medInvId || null,
+      cantidadUsada,
+      dosis:            document.getElementById('s-dosis').value,
+      fecha,
+      proxima,
+      veterinario:      document.getElementById('s-vet').value,
+      intervaloDias,
+    });
+
+    // Si tiene intervalo y próxima, crear recordatorio pendiente automáticamente
+    if (intervaloDias > 0 && proxima) {
+      db.salud.push({
+        id:              nuevoId('S'),
+        animalId,
+        tipo:            document.getElementById('s-tipo').value,
+        desc,
+        medicamento:     '', medicamentoInvId: null, cantidadUsada: 0, dosis: '',
+        fecha:           proxima,
+        proxima:         calcularProximaFecha(proxima, intervaloDias),
+        veterinario:     '',
+        eventoProtocolo: desc,
+        intervaloDias,
+        pendiente:       true,
+      });
+    }
+  }
+
   guardarDB();
   cerrarModal('modal-salud');
   renderSalud();
   renderInventario();
-  ['s-desc','s-medicamento','s-dosis','s-proxima','s-vet','s-cantidad-usada'].forEach(function(id) {
+  // Reset form
+  ['s-desc','s-medicamento','s-dosis','s-proxima','s-vet','s-cantidad-usada',
+   's-protocolo-id','s-intervalo-dias'].forEach(function(id) {
     document.getElementById(id).value = '';
   });
   document.getElementById('s-medicamento-inv').value = '';
+  document.getElementById('s-proxima-label').textContent = '';
+  document.getElementById('s-panel-protocolos').style.display = 'none';
 }
 
 function eliminarSalud(id) {
@@ -1157,24 +1300,39 @@ function renderTablaAnimales() {
   const filtrados = db.animales.filter(function(a) {
     if (filtTip && a.tipo   !== filtTip) return false;
     if (filtEst && a.estado !== filtEst) return false;
-    if (busca && !a.nombre.toLowerCase().includes(busca) && !a.id.toLowerCase().includes(busca)) return false;
+    if (busca && !a.nombre.toLowerCase().includes(busca) &&
+        !a.id.toLowerCase().includes(busca) &&
+        !(a.arete || '').toLowerCase().includes(busca)) return false;
     return true;
   });
   document.getElementById('conteo-animales').textContent = filtrados.length + ' resultados';
+
+  // Contar pendientes de protocolo por animal para mostrar badge
+  const pendientesPorAnimal = {};
+  db.salud.filter(function(s) { return s.pendiente === true; }).forEach(function(s) {
+    pendientesPorAnimal[s.animalId] = (pendientesPorAnimal[s.animalId] || 0) + 1;
+  });
+
   document.getElementById('tbody-animales').innerHTML = filtrados.map(function(a) {
+    const nPend = pendientesPorAnimal[a.id] || 0;
+    const tieneProtocolo = a.protocolosAplicados && a.protocolosAplicados.length > 0;
     return '<tr onclick="verFicha(\'' + a.id + '\')">' +
-      '<td><code style="font-size:0.78rem;color:var(--verde-medio)">' + a.id + '</code></td>' +
+      '<td><code style="font-size:0.78rem;color:var(--verde-medio)">' + a.id + '</code>' +
+        (a.arete ? '<br><small style="color:var(--gris-texto)">🏷️ ' + a.arete + '</small>' : '') + '</td>' +
       '<td>' + (a.tipo === 'bovino' ? '🐄' : '🐎') + ' ' + a.tipo + '</td>' +
-      '<td><strong>' + a.nombre + '</strong></td>' +
+      '<td><strong>' + a.nombre + '</strong>' +
+        (nPend > 0 ? ' <span class="badge badge-rojo" title="' + nPend + ' pendientes de protocolo" style="font-size:0.68rem">🛡️ ' + nPend + '</span>' : '') +
+      '</td>' +
       '<td><span class="badge ' + (a.sexo === 'hembra' ? 'badge-tierra' : 'badge-azul') + '">' + a.sexo + '</span></td>' +
       '<td>' + (a.raza || '-') + '</td><td>' + edad(a.nacimiento) + '</td><td>' + a.peso + ' kg</td>' +
       '<td>' + badgeEstado(a.estado) + '</td>' +
-      '<td style="display:flex;gap:6px">' +
-        '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();editarAnimal(\'' + a.id + '\')">✏️</button>' +
-        '<button class="btn btn-sm btn-rojo"    onclick="event.stopPropagation();eliminarAnimal(\'' + a.id + '\')">🗑️</button>' +
+      '<td style="display:flex;gap:5px;flex-wrap:wrap">' +
+        '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();editarAnimal(\'' + a.id + '\')" title="Editar">✏️</button>' +
+        '<button class="btn btn-sm btn-outline" onclick="event.stopPropagation();aplicarProtocoloAAnimalExistente(\'' + a.id + '\')" title="Aplicar protocolo">🛡️</button>' +
+        '<button class="btn btn-sm btn-rojo" onclick="event.stopPropagation();eliminarAnimal(\'' + a.id + '\')" title="Eliminar">🗑️</button>' +
         (a.estado === 'muerto' || a.estado === 'vendido' ? '<button class="btn btn-sm" style="background:#7c5c3c;color:#fff" title="Eliminar todo" onclick="event.stopPropagation();eliminarCompleto(\'' + a.id + '\')">🗑️✕</button>' : '') +
       '</td>' +
-      '</tr>';
+    '</tr>';
   }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--gris-texto);padding:1.5rem">Sin animales que coincidan</td></tr>';
 }
 
@@ -1190,7 +1348,6 @@ function verFicha(id) {
   const totalL  = lecheA.reduce(function(s, l) { return s + l.litros; }, 0);
   const promL   = lecheA.length > 0 ? (totalL / lecheA.length).toFixed(1) : '-';
 
-  // Calcular ganancia de peso total desde carne
   let gananciaTotal = '-';
   if (carneA.length >= 2) {
     gananciaTotal = (carneA[carneA.length-1].peso - carneA[0].peso).toFixed(1) + ' kg';
@@ -1208,6 +1365,25 @@ function verFicha(id) {
       '</div>' +
     '</div>' : '';
 
+  // Sección SINIGAN / Trazabilidad
+  const tieneTrazabilidad = a.arete || a.marcaCandela;
+  const trazabilidad = tieneTrazabilidad ?
+    '<div style="background:var(--azul-pastel);border:1px solid var(--azul);border-radius:8px;padding:10px 14px;margin-bottom:1rem">' +
+      '<p style="font-size:0.78rem;font-weight:700;color:var(--azul);margin-bottom:6px">🏷️ TRAZABILIDAD OFICIAL</p>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">' +
+        '<div><span style="color:var(--gris-texto)">Arete / SINIGAN</span><p style="font-weight:700;margin-top:2px">' + (a.arete || '<span style="color:var(--gris-texto)">Sin registrar</span>') + '</p></div>' +
+        '<div><span style="color:var(--gris-texto)">Marca en candela / Hierro</span><p style="font-weight:700;margin-top:2px">' + (a.marcaCandela || '<span style="color:var(--gris-texto)">Sin registrar</span>') + '</p></div>' +
+      '</div>' +
+    '</div>' : '';
+
+  // Estado reproductivo equino
+  const estadoReprod = (a.tipo === 'equino' && a.sexo === 'macho' && a.estadoReproductivo) ?
+    '<div style="margin-bottom:0.8rem">' +
+      (a.estadoReproductivo === 'entero'
+        ? '<span class="badge badge-tierra" style="font-size:0.82rem;padding:5px 10px">🐎 Semental (entero)</span>'
+        : '<span class="badge badge-gris" style="font-size:0.82rem;padding:5px 10px">✂️ Capado</span>') +
+    '</div>' : '';
+
   document.getElementById('ficha-contenido').innerHTML =
     '<div class="ficha-animal">' +
       (a.foto ? '<img src="' + a.foto + '" alt="' + a.nombre + '" style="width:64px;height:64px;border-radius:14px;object-fit:cover;border:1px solid var(--gris-borde)">' :
@@ -1221,6 +1397,8 @@ function verFicha(id) {
           '<span class="badge badge-gris">' + a.tipo + '</span></div>' +
       '</div>' +
     '</div>' +
+    estadoReprod +
+    trazabilidad +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1rem">' +
       '<div class="stat-card"><div class="stat-label">Peso</div><div class="stat-value" style="font-size:1.2rem">' + a.peso + ' kg</div></div>' +
       '<div class="stat-card"><div class="stat-label">Nacimiento</div><div class="stat-value" style="font-size:1rem">' + fmt(a.nacimiento) + '</div></div>' +
@@ -1230,13 +1408,45 @@ function verFicha(id) {
       (a.potreroFecha ? ' · desde ' + fmt(a.potreroFecha) + (diasPara(a.potreroFecha) !== null ? ' (' + Math.abs(diasPara(a.potreroFecha)) + ' días)' : '') : '') + '</div>' : '') +
     (a.notas ? '<div class="ayuda" style="margin-bottom:1rem">📝 ' + a.notas + '</div>' : '') +
     genealogia +
+
+    // Protocolos activos del animal
+    (function() {
+      const prots = a.protocolosAplicados || [];
+      const pendientesAnimal = db.salud.filter(function(s) { return s.animalId === id && s.pendiente === true; });
+      return '<div style="margin-top:1rem">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+          '<p style="font-size:0.78rem;font-weight:700;color:var(--gris-texto)">🛡️ PROTOCOLOS ACTIVOS</p>' +
+          '<button class="btn btn-sm btn-outline" onclick="cerrarModal(\'modal-ficha\');aplicarProtocoloAAnimalExistente(\'' + id + '\')">+ Aplicar protocolo</button>' +
+        '</div>' +
+        (prots.length === 0
+          ? '<p style="font-size:0.82rem;color:var(--gris-texto)">Sin protocolos aplicados. Usa el botón para asignar uno.</p>'
+          : prots.map(function(ap) {
+              const prot = db.protocolos.find(function(p) { return p.id === ap.protocoloId; });
+              return '<span class="badge badge-verde" style="margin-right:4px">' + (prot ? prot.nombre : ap.protocoloId) + '</span>';
+            }).join('')) +
+        (pendientesAnimal.length > 0
+          ? '<div style="margin-top:8px;background:var(--amarillo-pastel);border-radius:8px;padding:8px 10px">' +
+              '<p style="font-size:0.78rem;font-weight:700;color:#7a5c00;margin-bottom:4px">⏰ Eventos pendientes (' + pendientesAnimal.length + ')</p>' +
+              pendientesAnimal.slice(0, 4).map(function(s) {
+                const d = diasPara(s.fecha);
+                return '<div style="font-size:0.78rem;display:flex;justify-content:space-between;padding:2px 0">' +
+                  '<span>' + (s.desc || s.tipo) + '</span>' +
+                  '<span class="badge ' + (d < 0 ? 'badge-rojo' : d <= 7 ? 'badge-amarillo' : 'badge-azul') + '">' +
+                    (d < 0 ? 'Vencido' : d === 0 ? '¡Hoy!' : 'en ' + d + 'd') +
+                  '</span></div>';
+              }).join('') +
+              (pendientesAnimal.length > 4 ? '<p style="font-size:0.75rem;color:var(--gris-texto);margin-top:4px">+ ' + (pendientesAnimal.length - 4) + ' más en Salud</p>' : '') +
+            '</div>'
+          : '') +
+      '</div>';
+    })() +
     '<div style="margin-top:1rem">' +
       '<p style="font-size:0.78rem;font-weight:700;color:var(--gris-texto);margin-bottom:6px">💉 HISTORIAL MÉDICO (' + saludA.length + ' registros)</p>' +
       (saludA.length === 0 ? '<p style="font-size:0.82rem;color:var(--gris-texto)">Sin registros médicos.</p>' :
-        saludA.map(function(s) {
+        saludA.sort(function(x,y){return x.fecha>y.fecha?-1:1;}).map(function(s) {
           return '<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--gris-borde);font-size:0.82rem">' +
-            '<span>' + (tipoIcon[s.tipo] || '🏥') + ' <strong>' + s.tipo + '</strong> — ' + (s.desc || '-') + (s.medicamento ? ' · ' + s.medicamento + ' ' + s.dosis : '') + '</span>' +
-            '<span style="color:var(--gris-texto)">' + fmt(s.fecha) + '</span></div>';
+            '<span>' + (tipoIcon[s.tipo] || '🏥') + ' <strong>' + s.tipo + '</strong> — ' + (s.desc || '-') + (s.medicamento ? ' · ' + s.medicamento + ' ' + s.dosis : '') + (s.origenProtocolo ? ' <span style="font-size:0.7rem;color:var(--gris-texto)">(protocolo)</span>' : '') + '</span>' +
+            '<span style="color:var(--gris-texto)">' + fmt(s.fecha) + (s.proxima ? ' · próx. ' + fmt(s.proxima) : '') + '</span></div>';
         }).join('')) +
     '</div>' +
     (a.tipo === 'bovino' && a.sexo === 'hembra' ?
@@ -1341,7 +1551,46 @@ function renderReproduccion() {
 // RENDER — SALUD
 // ============================================================
 function renderSalud() {
-  const activos = db.animales.filter(function(a) { return a.estado === 'activo'; }).map(function(a) { return a.id; });
+  const hoy = hoyISO();
+  const tipoIcon = { vacuna: '💉', desparasitacion: '🪱', herraje: '🔩', odontologia: '🦷', vitamina: '💊', otro: '🏥' };
+
+  // ── Panel de pendientes de protocolo ──
+  const pendientes = db.salud
+    .filter(function(s) { return s.pendiente === true; })
+    .sort(function(a, b) { return a.fecha < b.fecha ? -1 : 1; });
+
+  const bodyPend = document.getElementById('pendientes-protocolo-body');
+  if (bodyPend) {
+    if (pendientes.length === 0) {
+      bodyPend.innerHTML = '<p style="color:var(--gris-texto);font-size:0.85rem">✅ Sin eventos pendientes de protocolo</p>';
+    } else {
+      bodyPend.innerHTML = pendientes.map(function(s) {
+        const animal = db.animales.find(function(a) { return a.id === s.animalId; });
+        const d      = diasPara(s.fecha);
+        const esHoy  = s.fecha === hoy;
+        const vencido= d < 0;
+        return '<div class="pendiente-item' + (vencido ? ' vencido' : esHoy ? ' hoy' : '') + '">' +
+          '<div>' +
+            '<strong>' + (tipoIcon[s.tipo] || '🏥') + ' ' + (s.desc || s.tipo) + '</strong>' +
+            '<span style="color:var(--gris-texto);font-size:0.78rem;margin-left:8px">' +
+              (animal ? (animal.tipo === 'bovino' ? '🐄' : '🐎') + ' ' + animal.nombre : s.animalId) +
+            '</span>' +
+            (s.intervaloDias > 0 ? '<span class="badge badge-gris" style="margin-left:6px;font-size:0.68rem">cada ' + s.intervaloDias + 'd</span>' : '') +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span class="badge ' +
+              (vencido ? 'badge-rojo' : esHoy ? 'badge-amarillo' : diasPara(s.fecha) <= 14 ? 'badge-amarillo' : 'badge-azul') + '">' +
+              (vencido ? 'Vencido hace ' + Math.abs(d) + 'd' : esHoy ? '¡Hoy!' : 'En ' + d + ' días · ' + fmt(s.fecha)) +
+            '</span>' +
+            '<button class="btn btn-sm btn-verde" onclick="marcarPendienteComoHecho(\'' + s.id + '\')">✅ Ejecutar hoy</button>' +
+            '<button class="btn btn-sm btn-outline" onclick="eliminarSalud(\'' + s.id + '\')" title="Eliminar recordatorio">🗑️</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  // ── Alertas activas (próximas fechas en registros ejecutados) ──
   const alertas = calcularAlertas();
   const body    = document.getElementById('alertas-salud-body');
   if (alertas.length === 0) {
@@ -1349,29 +1598,64 @@ function renderSalud() {
   } else {
     body.innerHTML = alertas.map(function(a) {
       return '<div class="alerta-item ' + (a.dias < 0 ? 'alerta-roja' : a.urgente ? 'alerta-amarilla' : 'alerta-azul') + '">' +
-        '<div><strong style="font-size:0.85rem">' + a.animal + ' — ' + a.tipo + '</strong><p style="font-size:0.78rem;color:var(--gris-texto)">' + a.desc + '</p></div>' +
+        '<div><strong style="font-size:0.85rem">' + a.animal + ' — ' + a.tipo + '</strong>' +
+        '<p style="font-size:0.78rem;color:var(--gris-texto)">' + a.desc + '</p></div>' +
         '<span class="badge ' + (a.dias < 0 ? 'badge-rojo' : a.urgente ? 'badge-amarillo' : 'badge-azul') + '">' +
-          (a.dias < 0 ? 'Vencida hace ' + Math.abs(a.dias) + 'd' : a.dias === 0 ? '¡Hoy!' : 'En ' + a.dias + 'd') + '</span>' +
-        '</div>';
+          (a.dias < 0 ? 'Vencida hace ' + Math.abs(a.dias) + 'd' : a.dias === 0 ? '¡Hoy!' : 'En ' + a.dias + 'd') +
+        '</span>' +
+      '</div>';
     }).join('');
   }
-  const tipoIcon = { vacuna: '💉', desparasitacion: '🪱', herraje: '🔩', odontologia: '🦷', vitamina: '💊', otro: '🏥' };
-  document.getElementById('tbody-salud').innerHTML = db.salud
-    .filter(function(s) { return activos.indexOf(s.animalId) !== -1; })
-    .map(function(s) {
-      const a = db.animales.find(function(x) { return x.id === s.animalId; });
-      return '<tr>' +
-        '<td><strong>' + ((a && a.nombre) || s.animalId) + '</strong> <small>' + (a && a.tipo === 'bovino' ? '🐄' : '🐎') + '</small></td>' +
-        '<td><span class="badge badge-gris">' + (tipoIcon[s.tipo] || '🏥') + ' ' + s.tipo + '</span></td>' +
-        '<td>' + (s.desc || '-') + '</td>' +
-        '<td>' + (s.medicamento || '-') + (s.dosis ? ' · ' + s.dosis : '') + '</td>' +
-        '<td>' + fmt(s.fecha) + '</td>' +
-        '<td>' + (s.proxima ? '<span class="badge ' + (diasPara(s.proxima) <= 7 ? 'badge-rojo' : 'badge-amarillo') + '">' + fmt(s.proxima) + '</span>' : '-') + '</td>' +
-        '<td>' + (s.veterinario || '-') + '</td>' +
-        '<td><button class="btn btn-sm btn-rojo" onclick="eliminarSalud(\'' + s.id + '\')">🗑️</button></td>' +
-        '</tr>';
-    }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros</td></tr>';
+
+  // ── Tabla historial (solo eventos ejecutados, no pendientes) ──
+  const ejecutados = db.salud
+    .filter(function(s) { return !s.pendiente; })
+    .sort(function(a, b) { return a.fecha > b.fecha ? -1 : 1; });
+
+  document.getElementById('tbody-salud').innerHTML = ejecutados.map(function(s) {
+    const a = db.animales.find(function(x) { return x.id === s.animalId; });
+    return '<tr>' +
+      '<td><strong>' + ((a && a.nombre) || s.animalId) + '</strong> <small>' + (a ? (a.tipo === 'bovino' ? '🐄' : '🐎') : '') + '</small></td>' +
+      '<td><span class="badge badge-gris">' + (tipoIcon[s.tipo] || '🏥') + ' ' + s.tipo + '</span>' +
+        (s.origenProtocolo ? '<br><small style="color:var(--gris-texto);font-size:0.68rem">🛡️ protocolo</small>' : '') + '</td>' +
+      '<td>' + (s.desc || '-') + '</td>' +
+      '<td>' + (s.medicamento || '-') + (s.dosis ? ' · ' + s.dosis : '') + '</td>' +
+      '<td>' + fmt(s.fecha) + '</td>' +
+      '<td>' + (s.proxima ? '<span class="badge ' + (diasPara(s.proxima) <= 7 ? 'badge-rojo' : diasPara(s.proxima) <= 30 ? 'badge-amarillo' : 'badge-azul') + '">' + fmt(s.proxima) + '</span>' : '-') + '</td>' +
+      '<td>' + (s.veterinario || '-') + '</td>' +
+      '<td><button class="btn btn-sm btn-rojo" onclick="eliminarSalud(\'' + s.id + '\')">🗑️</button></td>' +
+    '</tr>';
+  }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--gris-texto);padding:1rem">Sin registros ejecutados</td></tr>';
 }
+
+// Marca un recordatorio pendiente como ejecutado hoy abriendo el modal pre-llenado
+function marcarPendienteComoHecho(pendienteId) {
+  const s = db.salud.find(function(x) { return x.id === pendienteId; });
+  if (!s) return;
+
+  // Llenar el modal de salud con los datos del pendiente
+  llenarSelectAnimales();
+  llenarSelectMedicamentos();
+
+  setTimeout(function() {
+    document.getElementById('s-animal').value     = s.animalId;
+    cargarProtocolosAnimal(s.animalId);
+    document.getElementById('s-tipo').value       = s.tipo;
+    document.getElementById('s-desc').value       = s.desc || '';
+    document.getElementById('s-fecha').value      = hoyISO();
+    document.getElementById('s-protocolo-id').value   = pendienteId;
+    document.getElementById('s-intervalo-dias').value  = s.intervaloDias || 0;
+    if (s.intervaloDias > 0) {
+      const prox = calcularProximaFecha(hoyISO(), s.intervaloDias);
+      document.getElementById('s-proxima').value = prox;
+      document.getElementById('s-proxima-label').textContent =
+        '(calculada automáticamente · cada ' + s.intervaloDias + ' días)';
+    }
+  }, 50);
+
+  abrirModal('modal-salud');
+}
+
 
 // ============================================================
 // RENDER — ALIMENTACIÓN
@@ -1701,8 +1985,352 @@ function renderInventarioMedicamentos() {
 }
 
 // ============================================================
-// CALENDARIO DE LA FINCA
+// PROTOCOLOS SANITARIOS
 // ============================================================
+const TIPOS_EVENTO_PROT = { vacuna: '💉 Vacuna', desparasitacion: '🪱 Desparasitación', vitamina: '💊 Vitamina', herraje: '🔩 Herraje', otro: '🏥 Otro' };
+let _idProtocoloEnEdicion = null;
+
+function renderProtocolos() {
+  const cont = document.getElementById('lista-protocolos');
+  if (!cont) return;
+  if (db.protocolos.length === 0) {
+    cont.innerHTML = '<p style="color:var(--gris-texto)">No hay protocolos. Crea uno con el botón de arriba.</p>';
+    return;
+  }
+  cont.innerHTML = db.protocolos.map(function(p) {
+    const esICA = p.id === 'P001' || p.id === 'P002';
+    return '<div class="card" style="margin-bottom:1rem">' +
+      '<div class="card-header">' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+          '<h3 style="margin:0">' + p.nombre + '</h3>' +
+          (esICA ? '<span class="badge badge-azul">ICA</span>' : '') +
+          '<span class="badge badge-gris">' + (p.tipo === 'bovino' ? '🐄 Bovinos' : p.tipo === 'equino' ? '🐎 Equinos' : '🐄🐎 Ambos') + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          '<button class="btn btn-sm btn-outline" onclick="editarProtocolo(\'' + p.id + '\')">✏️ Editar</button>' +
+          (!esICA ? '<button class="btn btn-sm btn-rojo" onclick="eliminarProtocolo(\'' + p.id + '\')">🗑️</button>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="tabla-wrap">' +
+        '<table><thead><tr><th>#</th><th>Evento</th><th>Tipo</th><th>Días desde inicio</th><th>Se repite cada</th></tr></thead>' +
+        '<tbody>' + (p.eventos || []).map(function(e, i) {
+          return '<tr>' +
+            '<td>' + (i + 1) + '</td>' +
+            '<td><strong>' + e.nombre + '</strong></td>' +
+            '<td><span class="badge badge-gris">' + (TIPOS_EVENTO_PROT[e.tipo] || e.tipo) + '</span></td>' +
+            '<td>' + e.diasDesdeInicio + ' días</td>' +
+            '<td>' + (e.intervaloRepeticion ? 'Cada ' + e.intervaloRepeticion + ' días' : 'Una sola vez') + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function editarProtocolo(id) {
+  const p = db.protocolos.find(function(x) { return x.id === id; });
+  if (!p) return;
+  _idProtocoloEnEdicion = id;
+  document.getElementById('prot-nombre').value = p.nombre;
+  document.getElementById('prot-tipo').value   = p.tipo;
+  const lista = document.getElementById('prot-eventos-lista');
+  lista.innerHTML = '';
+  (p.eventos || []).forEach(function(e) { agregarFilaEventoProtocolo(e); });
+  abrirModal('modal-protocolo');
+}
+
+function eliminarProtocolo(id) {
+  if (!confirm('¿Eliminar este protocolo?')) return;
+  db.protocolos = db.protocolos.filter(function(p) { return p.id !== id; });
+  guardarDB();
+  renderProtocolos();
+}
+
+function agregarFilaEventoProtocolo(datos) {
+  datos = datos || {};
+  const lista = document.getElementById('prot-eventos-lista');
+  const div = document.createElement('div');
+  div.className = 'prot-evento-fila';
+  div.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;margin-bottom:6px;align-items:center';
+  div.innerHTML =
+    '<input type="text" class="pe-nombre" placeholder="Nombre del evento" value="' + (datos.nombre || '') + '" style="padding:6px 8px;border:1px solid var(--gris-borde);border-radius:6px;font-size:0.82rem">' +
+    '<select class="pe-tipo" style="padding:6px 8px;border:1px solid var(--gris-borde);border-radius:6px;font-size:0.82rem">' +
+      Object.entries(TIPOS_EVENTO_PROT).map(function(kv) {
+        return '<option value="' + kv[0] + '"' + (datos.tipo === kv[0] ? ' selected' : '') + '>' + kv[1] + '</option>';
+      }).join('') +
+    '</select>' +
+    '<input type="number" class="pe-dias" placeholder="Días inicio" value="' + (datos.diasDesdeInicio || 0) + '" style="padding:6px 8px;border:1px solid var(--gris-borde);border-radius:6px;font-size:0.82rem" title="Días desde la fecha de inicio">' +
+    '<input type="number" class="pe-intervalo" placeholder="Repetir cada X días (0=no)" value="' + (datos.intervaloRepeticion || 0) + '" style="padding:6px 8px;border:1px solid var(--gris-borde);border-radius:6px;font-size:0.82rem" title="Intervalo de repetición en días (0 = no repetir)">' +
+    '<button type="button" onclick="this.parentElement.remove()" style="background:var(--rojo);color:#fff;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:0.9rem">×</button>';
+  lista.appendChild(div);
+}
+
+function guardarProtocolo() {
+  const nombre = document.getElementById('prot-nombre').value.trim();
+  if (!nombre) { alert('⚠️ Escribe el nombre del protocolo'); return; }
+  const filas = document.querySelectorAll('.prot-evento-fila');
+  const eventos = [];
+  filas.forEach(function(f) {
+    const n = f.querySelector('.pe-nombre').value.trim();
+    if (!n) return;
+    eventos.push({
+      nombre: n,
+      tipo:              f.querySelector('.pe-tipo').value,
+      diasDesdeInicio:   Number(f.querySelector('.pe-dias').value) || 0,
+      intervaloRepeticion: Number(f.querySelector('.pe-intervalo').value) || 0,
+    });
+  });
+  if (eventos.length === 0) { alert('⚠️ Agrega al menos un evento al protocolo'); return; }
+  if (_idProtocoloEnEdicion) {
+    const i = db.protocolos.findIndex(function(p) { return p.id === _idProtocoloEnEdicion; });
+    if (i !== -1) {
+      db.protocolos[i].nombre = nombre;
+      db.protocolos[i].tipo   = document.getElementById('prot-tipo').value;
+      db.protocolos[i].eventos = eventos;
+    }
+  } else {
+    db.protocolos.push({ id: nuevoId('PROT'), nombre, tipo: document.getElementById('prot-tipo').value, eventos });
+  }
+  guardarDB();
+  cerrarModal('modal-protocolo');
+  renderProtocolos();
+  _idProtocoloEnEdicion = null;
+  document.getElementById('prot-nombre').value = '';
+  document.getElementById('prot-eventos-lista').innerHTML = '';
+}
+
+// ---- Aplicar protocolo a un animal ----
+function previsualizarProtocolo() {
+  const selId    = document.getElementById('ap-protocolo').value;
+  const fechaIni = document.getElementById('ap-fecha-inicio').value;
+  const prot = db.protocolos.find(function(p) { return p.id === selId; });
+  const prev = document.getElementById('ap-preview');
+  if (!prot || !fechaIni) { prev.innerHTML = ''; return; }
+  const base = new Date(fechaIni + 'T12:00:00');
+  let html = '<div style="background:var(--crema);border-radius:8px;padding:10px;margin-top:6px"><p style="font-size:0.8rem;font-weight:700;color:var(--verde-oscuro);margin-bottom:6px">Recordatorios que se crearán:</p>';
+  prot.eventos.forEach(function(e) {
+    const fechaEv = new Date(base.getTime());
+    fechaEv.setDate(fechaEv.getDate() + (e.diasDesdeInicio || 0));
+    const fStr = fechaEv.toISOString().split('T')[0];
+    html += '<div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:3px 0;border-bottom:1px solid var(--gris-borde)">' +
+      '<span>' + (TIPOS_EVENTO_PROT[e.tipo] || e.tipo) + ' · ' + e.nombre + '</span>' +
+      '<span style="color:var(--gris-texto)">' + fmt(fStr) + (e.intervaloRepeticion > 0 ? ' · repite c/' + e.intervaloRepeticion + 'd' : '') + '</span>' +
+    '</div>';
+  });
+  html += '</div>';
+  prev.innerHTML = html;
+}
+
+function confirmarAplicarProtocolo() {
+  if (!_animalPendiente) return;
+  const selId    = document.getElementById('ap-protocolo').value;
+  const fechaIni = document.getElementById('ap-fecha-inicio').value;
+  if (!selId || !fechaIni) { alert('⚠️ Elige el protocolo y la fecha de inicio'); return; }
+  const prot = db.protocolos.find(function(p) { return p.id === selId; });
+  if (!prot) return;
+
+  // Guardar en el animal cuáles protocolos tiene activos
+  if (!_animalPendiente.protocolosAplicados) _animalPendiente.protocolosAplicados = [];
+  _animalPendiente.protocolosAplicados.push({ protocoloId: selId, fechaInicio: fechaIni });
+
+  db.animales.push(_animalPendiente);
+  aplicarProtocoloAlAnimal(_animalPendiente.id, prot, fechaIni);
+
+  guardarDB();
+  cerrarModal('modal-aplicar-protocolo');
+  renderTablaAnimales();
+  renderSalud();
+  alert('✅ Animal "' + _animalPendiente.nombre + '" guardado.\nSe crearon ' + prot.eventos.length + ' recordatorios del protocolo "' + prot.nombre + '".');
+  _animalPendiente = null;
+  resetFormularioAnimal();
+}
+
+// Aplica un protocolo a un animal ya existente (desde el módulo de protocolos o al crear animal)
+function aplicarProtocoloAlAnimal(animalId, prot, fechaIni) {
+  const base = new Date(fechaIni + 'T12:00:00');
+  prot.eventos.forEach(function(e) {
+    const fechaEv = new Date(base.getTime());
+    fechaEv.setDate(fechaEv.getDate() + (e.diasDesdeInicio || 0));
+    const fStr = fechaEv.toISOString().split('T')[0];
+    db.salud.push({
+      id:               nuevoId('S'),
+      animalId,
+      tipo:             e.tipo,
+      desc:             e.nombre,
+      medicamento:      '', medicamentoInvId: null, cantidadUsada: 0, dosis: '',
+      fecha:            fStr,
+      proxima:          e.intervaloRepeticion > 0 ? calcularProximaFecha(fStr, e.intervaloRepeticion) : '',
+      veterinario:      '',
+      origenProtocolo:  prot.id,
+      eventoProtocolo:  e.nombre,
+      intervaloDias:    e.intervaloRepeticion || 0,
+      pendiente:        true,   // ← es un recordatorio futuro, todavía no ejecutado
+    });
+  });
+}
+
+// También permite aplicar un protocolo adicional a un animal ya registrado
+function aplicarProtocoloAAnimalExistente(animalId) {
+  const animal = db.animales.find(function(a) { return a.id === animalId; });
+  if (!animal) return;
+  const protDisp = db.protocolos.filter(function(p) { return p.tipo === animal.tipo || p.tipo === 'ambos'; });
+  if (protDisp.length === 0) { alert('No hay protocolos disponibles para este tipo de animal.'); return; }
+
+  // Reutilizamos el modal de aplicar protocolo
+  _animalPendiente = null; // no hay animal pendiente de guardar
+  _animalExistenteParaProtocolo = animalId;
+
+  const sel = document.getElementById('ap-protocolo');
+  sel.innerHTML = protDisp.map(function(p) {
+    return '<option value="' + p.id + '">' + p.nombre + '</option>';
+  }).join('');
+  document.getElementById('ap-fecha-inicio').value = hoyISO();
+  previsualizarProtocolo();
+
+  // Cambiar el botón de confirmar para el caso "animal ya existente"
+  const btnConfirmar = document.querySelector('#modal-aplicar-protocolo .btn-verde');
+  btnConfirmar.setAttribute('onclick', 'confirmarProtocoloExistente()');
+
+  abrirModal('modal-aplicar-protocolo');
+}
+
+let _animalExistenteParaProtocolo = null;
+
+function confirmarProtocoloExistente() {
+  if (!_animalExistenteParaProtocolo) return;
+  const selId    = document.getElementById('ap-protocolo').value;
+  const fechaIni = document.getElementById('ap-fecha-inicio').value;
+  if (!selId || !fechaIni) { alert('⚠️ Elige el protocolo y la fecha de inicio'); return; }
+  const prot = db.protocolos.find(function(p) { return p.id === selId; });
+  if (!prot) return;
+
+  const animal = db.animales.find(function(a) { return a.id === _animalExistenteParaProtocolo; });
+  if (!animal.protocolosAplicados) animal.protocolosAplicados = [];
+  animal.protocolosAplicados.push({ protocoloId: selId, fechaInicio: fechaIni });
+
+  aplicarProtocoloAlAnimal(_animalExistenteParaProtocolo, prot, fechaIni);
+  guardarDB();
+  cerrarModal('modal-aplicar-protocolo');
+  renderSalud();
+  alert('✅ Protocolo "' + prot.nombre + '" aplicado.\n' + prot.eventos.length + ' recordatorios creados.');
+
+  // Restaurar botón original
+  const btnConfirmar = document.querySelector('#modal-aplicar-protocolo .btn-verde');
+  btnConfirmar.setAttribute('onclick', 'confirmarAplicarProtocolo()');
+  _animalExistenteParaProtocolo = null;
+}
+
+function calcularProximaFecha(fechaBase, diasIntervalo) {
+  const d = new Date(fechaBase + 'T12:00:00');
+  d.setDate(d.getDate() + diasIntervalo);
+  return d.toISOString().split('T')[0];
+}
+
+// ── FUNCIONES DEL MODAL-SALUD CON PROTOCOLO ──
+
+// Cuando el usuario elige un animal en el modal-salud, muestra los botones de acceso rápido
+function cargarProtocolosAnimal(animalId) {
+  const panel   = document.getElementById('s-panel-protocolos');
+  const botones = document.getElementById('s-botones-protocolo');
+  if (!animalId) { panel.style.display = 'none'; return; }
+
+  const animal = db.animales.find(function(a) { return a.id === animalId; });
+  if (!animal || !animal.protocolosAplicados || animal.protocolosAplicados.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  // Recopilar todos los eventos de todos los protocolos activos del animal
+  const eventos = [];
+  animal.protocolosAplicados.forEach(function(ap) {
+    const prot = db.protocolos.find(function(p) { return p.id === ap.protocoloId; });
+    if (!prot) return;
+    prot.eventos.forEach(function(e) {
+      // Buscar el último registro de este evento para este animal (para calcular próxima)
+      const registros = db.salud.filter(function(s) {
+        return s.animalId === animalId && s.eventoProtocolo === e.nombre && !s.pendiente;
+      }).sort(function(a, b) { return a.fecha > b.fecha ? -1 : 1; });
+
+      // Buscar recordatorio pendiente
+      const pendiente = db.salud.find(function(s) {
+        return s.animalId === animalId && s.eventoProtocolo === e.nombre && s.pendiente === true;
+      });
+
+      let proximaFecha = '';
+      let diasRestantes = null;
+      if (pendiente) {
+        proximaFecha = pendiente.fecha;
+        diasRestantes = diasPara(pendiente.fecha);
+      } else if (registros.length > 0 && e.intervaloRepeticion > 0) {
+        proximaFecha = calcularProximaFecha(registros[0].fecha, e.intervaloRepeticion);
+        diasRestantes = diasPara(proximaFecha);
+      }
+
+      eventos.push({
+        nombre:        e.nombre,
+        tipo:          e.tipo,
+        protocoloId:   prot.id,
+        intervalo:     e.intervaloRepeticion || 0,
+        proximaFecha,
+        diasRestantes,
+        pendienteId:   pendiente ? pendiente.id : null,
+      });
+    });
+  });
+
+  if (eventos.length === 0) { panel.style.display = 'none'; return; }
+
+  panel.style.display = 'block';
+  const tipoIcon = { vacuna: '💉', desparasitacion: '🪱', herraje: '🔩', odontologia: '🦷', vitamina: '💊', otro: '🏥' };
+
+  botones.innerHTML = eventos.map(function(ev) {
+    let cls = '';
+    let badge = '';
+    if (ev.diasRestantes !== null) {
+      if (ev.diasRestantes < 0)  { cls = 'vencido'; badge = ' 🔴 Vencido hace ' + Math.abs(ev.diasRestantes) + 'd'; }
+      else if (ev.diasRestantes <= 14) { cls = 'proximo'; badge = ' ⏰ en ' + ev.diasRestantes + 'd'; }
+      else { badge = ' · ' + fmt(ev.proximaFecha); }
+    }
+    const dataEv = JSON.stringify(ev).replace(/"/g, '&quot;');
+    return '<button type="button" class="btn-protocolo-rapido ' + cls + '" onclick="aplicarEventoRapido(' + "'" + encodeURIComponent(JSON.stringify(ev)) + "'" + ')">' +
+      (tipoIcon[ev.tipo] || '🏥') + ' ' + ev.nombre + badge +
+    '</button>';
+  }).join('');
+}
+
+// Cuando se hace clic en un botón de acceso rápido del protocolo
+function aplicarEventoRapido(evJson) {
+  const ev = JSON.parse(decodeURIComponent(evJson));
+  const tipoMap = { vacuna: 'vacuna', desparasitacion: 'desparasitacion', herraje: 'herraje', odontologia: 'odontologia', vitamina: 'vitamina', otro: 'otro' };
+
+  document.getElementById('s-tipo').value  = tipoMap[ev.tipo] || 'otro';
+  document.getElementById('s-desc').value  = ev.nombre;
+  document.getElementById('s-fecha').value = hoyISO();
+  document.getElementById('s-protocolo-id').value   = ev.protocoloId;
+  document.getElementById('s-intervalo-dias').value  = ev.intervalo;
+
+  // Calcular próxima automáticamente desde HOY + intervalo
+  if (ev.intervalo > 0) {
+    const proxima = calcularProximaFecha(hoyISO(), ev.intervalo);
+    document.getElementById('s-proxima').value = proxima;
+    document.getElementById('s-proxima-label').textContent = '(calculada automáticamente · cada ' + ev.intervalo + ' días)';
+  } else {
+    document.getElementById('s-proxima').value = '';
+    document.getElementById('s-proxima-label').textContent = '(evento sin repetición)';
+  }
+
+  // Si hay un pendiente vinculado, guardarlo para actualizarlo al guardar
+  document.getElementById('s-protocolo-id').value = ev.pendienteId || '';
+}
+
+// Cuando el usuario cambia la fecha del evento manualmente, recalcular próxima
+function recalcularProximaDesdeIntervalo() {
+  const intervalo = Number(document.getElementById('s-intervalo-dias').value) || 0;
+  const fecha     = document.getElementById('s-fecha').value;
+  if (intervalo > 0 && fecha) {
+    document.getElementById('s-proxima').value = calcularProximaFecha(fecha, intervalo);
+  }
+}
 let calMesActual = new Date().getMonth();
 let calAnioActual = new Date().getFullYear();
 const MESES_NOMBRE = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
@@ -1715,15 +2343,23 @@ function cambiarMesCalendario(delta) {
 }
 
 function recolectarEventosCalendario() {
-  // Cada evento: { fecha (YYYY-MM-DD), tipo: 'salud'|'repro'|'med'|'servicio', texto }
   const eventos = [];
-  const activos = db.animales.filter(function(a) { return a.estado === 'activo'; });
   const porId = {};
   db.animales.forEach(function(a) { porId[a.id] = a; });
 
-  // Próximas fechas de salud (vacunas, desparasitaciones, etc.)
-  db.salud.forEach(function(s) {
-    if (!s.proxima) return;
+  // Eventos PENDIENTES de protocolo (recordatorios futuros)
+  db.salud.filter(function(s) { return s.pendiente === true; }).forEach(function(s) {
+    const a = porId[s.animalId];
+    eventos.push({ fecha: s.fecha, tipo: 'salud', texto: '🛡️ ' + (s.desc || s.tipo) + ': ' + (a ? a.nombre : s.animalId) });
+  });
+
+  // Próximas fechas de salud ejecutados (campo proxima, solo si no hay pendiente equivalente)
+  db.salud.filter(function(s) { return !s.pendiente && s.proxima; }).forEach(function(s) {
+    // No duplicar si ya hay un pendiente para este mismo evento+animal
+    const yaHayPendiente = db.salud.some(function(p) {
+      return p.pendiente && p.animalId === s.animalId && p.eventoProtocolo === s.eventoProtocolo;
+    });
+    if (yaHayPendiente) return;
     const a = porId[s.animalId];
     eventos.push({ fecha: s.proxima, tipo: 'salud', texto: '💉 ' + (s.tipo || 'Evento') + ': ' + (a ? a.nombre : s.animalId) });
   });
@@ -1741,7 +2377,7 @@ function recolectarEventosCalendario() {
     eventos.push({ fecha: m.vencimiento, tipo: 'med', texto: '💊 Vence: ' + m.nombre });
   });
 
-  // Servicios de monta (fecha del servicio)
+  // Servicios de monta
   db.servicios.forEach(function(s) {
     eventos.push({ fecha: s.fecha, tipo: 'servicio', texto: '🐎 Servicio: ' + s.sementalNombre + ' × "' + s.yegua + '"' + (s.estado === 'pendiente' ? ' (pago pendiente)' : '') });
   });
@@ -1934,72 +2570,113 @@ function descargarFichaWord() {
 
   const children = [];
 
-  // Encabezado
-  children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun((a.tipo === 'bovino' ? 'Bovino' : 'Equino') + ' — ' + a.nombre)] }));
-  children.push(new Paragraph({ spacing: { after: 200 }, children: [new TextRun({ text: 'Ficha generada el ' + fmt(hoyISO()) + ' · ' + (db.config.nombre || 'Mi Finca'), italics: true, size: 18, color: '666666' })] }));
+  // ── Encabezado oficial ICA/FEDEGAN ──
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 60 },
+    children: [new TextRun({ text: 'REPÚBLICA DE COLOMBIA', bold: true, size: 22, font: 'Arial' })]
+  }));
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 60 },
+    children: [new TextRun({ text: 'INSTITUTO COLOMBIANO AGROPECUARIO — ICA', bold: true, size: 22, font: 'Arial', color: '1B4332' })]
+  }));
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 60 },
+    children: [new TextRun({ text: 'FEDEGAN — Federación Colombiana de Ganaderos', size: 20, font: 'Arial', color: '2D6A4F' })]
+  }));
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 80 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '1B4332', space: 1 } },
+    children: [new TextRun({ text: 'FICHA INDIVIDUAL DE ANIMAL — SISTEMA DE TRAZABILIDAD', bold: true, size: 24, font: 'Arial' })]
+  }));
 
-  // Foto si existe
+  // Datos del predio
+  children.push(new Paragraph({ spacing: { before: 160, after: 80 }, children: [new TextRun({ text: 'DATOS DEL PREDIO', bold: true, size: 22, color: '1B4332' })] }));
+  children.push(tablaSimple(['Campo', 'Valor'], [
+    ['Nombre del predio', db.config.nombre || '-'],
+    ['Propietario', db.config.propietario || '-'],
+    ['Ubicación', db.config.lugar || '-'],
+    ['Fecha de expedición', fmt(hoyISO())],
+  ], [3000, 6360]));
+
+  // Foto
   if (a.foto) {
     try {
       const imgBytes = dataURLtoUint8Array(a.foto);
       children.push(new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 200 },
-        children: [new ImageRun({ type: 'jpg', data: imgBytes, transformation: { width: 200, height: 200 } })]
+        spacing: { before: 160, after: 80 },
+        children: [new ImageRun({ type: 'jpg', data: imgBytes, transformation: { width: 180, height: 180 } })]
       }));
     } catch(e) { console.error('Error agregando foto al Word:', e); }
   }
 
-  // Información general
-  children.push(tituloSeccion('Información general'));
+  // Información general del animal
+  children.push(tituloSeccion('1. Identificación del animal'));
   children.push(tablaSimple(['Campo', 'Valor'], [
-    ['ID', a.id],
-    ['Tipo', a.tipo === 'bovino' ? 'Bovino' : 'Equino'],
-    ['Sexo', a.sexo],
+    ['ID interno del sistema', a.id],
+    ['Nombre', a.nombre],
+    ['Especie', a.tipo === 'bovino' ? 'Bovina' : 'Equina'],
+    ['Sexo', a.sexo === 'hembra' ? 'Hembra' : 'Macho'],
     ['Raza', a.raza || '-'],
     ['Fecha de nacimiento', fmt(a.nacimiento)],
     ['Edad', edad(a.nacimiento)],
-    ['Peso actual', a.peso + ' kg'],
+    ['Peso actual (kg)', a.peso + ' kg'],
     ['Estado', a.estado],
     ['Procedencia', a.procedencia],
-    ['Madre', a.madre || '-'],
-    ['Padre', a.padre || '-'],
-  ], [3000, 6360]));
+    ['Madre (ID)', a.madre || '-'],
+    ['Padre (ID)', a.padre || '-'],
+    ...(a.tipo === 'equino' && a.sexo === 'macho' ? [['Estado reproductivo', a.estadoReproductivo === 'entero' ? 'Entero (Semental)' : 'Capado / Castrado']] : []),
+  ], [3500, 5860]));
 
   if (a.notas) {
-    children.push(new Paragraph({ spacing: { before: 120 }, children: [new TextRun({ text: 'Notas: ', bold: true }), new TextRun(a.notas)] }));
+    children.push(new Paragraph({ spacing: { before: 100 }, children: [new TextRun({ text: 'Observaciones: ', bold: true }), new TextRun(a.notas)] }));
   }
 
+  // TRAZABILIDAD / SINIGAN
+  children.push(tituloSeccion('2. Trazabilidad y marcación oficial'));
+  children.push(tablaSimple(['Identificación', 'Valor'], [
+    ['Número de arete / Código SINIGAN', a.arete || 'No registrado'],
+    ['Marca en candela / Hierro', a.marcaCandela || 'No registrado'],
+  ], [4000, 5360]));
+  children.push(new Paragraph({
+    spacing: { before: 80 },
+    children: [new TextRun({ text: 'Nota: ', bold: true, size: 18 }), new TextRun({ text: 'El código SINIGAN (Sistema de Información de la Cadena Bovina) es el número oficial de trazabilidad asignado por el ICA. Su registro es obligatorio para movilización y comercialización de ganado.', size: 18, color: '666666' })]
+  }));
+
   // Ubicación / potrero
-  children.push(tituloSeccion('Ubicación'));
+  children.push(tituloSeccion('3. Ubicación actual'));
   if (a.potrero) {
     const diasEn = a.potreroFecha ? Math.abs(diasPara(a.potreroFecha)) : null;
-    children.push(new Paragraph({ children: [new TextRun({ text: 'Potrero / lugar actual: ', bold: true }), new TextRun(a.potrero)] }));
-    if (a.potreroFecha) {
-      children.push(new Paragraph({ children: [new TextRun({ text: 'Desde: ', bold: true }), new TextRun(fmt(a.potreroFecha) + (diasEn !== null ? ' (hace ' + diasEn + ' días)' : ''))] }));
-    }
+    children.push(tablaSimple(['Campo', 'Valor'], [
+      ['Potrero / lugar actual', a.potrero],
+      ['En este potrero desde', a.potreroFecha ? fmt(a.potreroFecha) + (diasEn !== null ? ' (hace ' + diasEn + ' días)' : '') : '-'],
+    ], [3500, 5860]));
   } else {
     children.push(new Paragraph({ children: [new TextRun('No se ha registrado un potrero o ubicación para este animal.')] }));
   }
 
   // Historial médico / medicamentos
-  children.push(tituloSeccion('Historial médico y medicamentos'));
+  children.push(tituloSeccion('4. Historial sanitario y medicamentos'));
   if (saludA.length === 0) {
     children.push(new Paragraph({ children: [new TextRun('Sin registros médicos.')] }));
   } else {
     children.push(tablaSimple(
-      ['Fecha', 'Tipo', 'Descripción', 'Medicamento / Dosis', 'Próxima', 'Veterinario'],
+      ['Fecha', 'Tipo', 'Descripción / Protocolo', 'Medicamento / Dosis', 'Próxima fecha', 'Veterinario'],
       saludA.map(function(s) {
         return [
           fmt(s.fecha),
           tipoIcon[s.tipo] || s.tipo,
-          s.desc || '-',
+          (s.desc || '-') + (s.origenProtocolo ? ' (Prot.)' : ''),
           (s.medicamento || '-') + (s.dosis ? ' (' + s.dosis + ')' : ''),
           s.proxima ? fmt(s.proxima) : '-',
           s.veterinario || '-'
         ];
       }),
-      [1100, 1300, 2300, 2160, 1100, 1400]
+      [1100, 1300, 2200, 2060, 1300, 1400]
     ));
   }
 
@@ -2007,16 +2684,16 @@ function descargarFichaWord() {
   if (a.tipo === 'bovino' && a.sexo === 'hembra' && lecheA.length > 0) {
     const totalL = lecheA.reduce(function(s, l) { return s + l.litros; }, 0);
     const promL  = (totalL / lecheA.length).toFixed(1);
-    children.push(tituloSeccion('Producción de leche'));
-    children.push(new Paragraph({ children: [new TextRun('Registros: ' + lecheA.length + ' · Total: ' + totalL.toFixed(1) + ' L · Promedio: ' + promL + ' L/día')] }));
+    children.push(tituloSeccion('5. Producción de leche'));
+    children.push(new Paragraph({ children: [new TextRun('Registros: ' + lecheA.length + ' · Total acumulado: ' + totalL.toFixed(1) + ' L · Promedio diario: ' + promL + ' L/día')] }));
   }
 
   // Historial de pesajes / carne
   if (carneA.length > 0) {
-    children.push(tituloSeccion('Historial de pesajes'));
+    children.push(tituloSeccion('6. Historial de pesajes'));
     let gananciaTotal = '-';
     if (carneA.length >= 2) gananciaTotal = (carneA[carneA.length-1].peso - carneA[0].peso).toFixed(1) + ' kg';
-    children.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun('Ganancia total: ' + gananciaTotal)] }));
+    children.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: 'Ganancia de peso total: ', bold: true }), new TextRun(gananciaTotal)] }));
     children.push(tablaSimple(
       ['Fecha', 'Peso (kg)', 'Precio/kg', 'Destino', 'Observaciones'],
       carneA.slice().sort(function(x,y){ return x.fecha > y.fecha ? -1 : 1; }).map(function(c) {
@@ -2029,7 +2706,7 @@ function descargarFichaWord() {
 
   // Historial reproductivo
   if (reproA.length > 0) {
-    children.push(tituloSeccion('Historial reproductivo'));
+    children.push(tituloSeccion('7. Historial reproductivo'));
     children.push(tablaSimple(
       ['Fecha', 'Evento', 'Macho', '¿Gestante?', 'Parto estimado', 'Observaciones'],
       reproA.map(function(r) {
@@ -2038,6 +2715,15 @@ function descargarFichaWord() {
       [1100, 1300, 1300, 1100, 1500, 3060]
     ));
   }
+
+  // Firma
+  children.push(new Paragraph({ spacing: { before: 600 }, children: [] }));
+  children.push(tablaSimple(['Firma del responsable / Veterinario', 'Fecha', 'Sello del predio'], [['', '', '']], [4000, 2500, 2860]));
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 200 },
+    children: [new TextRun({ text: 'Documento generado por el sistema Mi Finca · ' + fmt(hoyISO()), size: 16, color: '999999', italics: true })]
+  }));
 
   const doc = new Document({
     styles: {

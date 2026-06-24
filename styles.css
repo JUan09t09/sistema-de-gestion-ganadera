@@ -613,6 +613,27 @@ tr:last-child td { border-bottom: none; }
   font-size: 2rem; flex-shrink: 0;
 }
 
+/* ============ PROTOCOLOS ============ */
+.btn-protocolo-rapido {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 20px; font-size: 0.78rem;
+  border: 1.5px solid var(--tierra); background: var(--tierra-pastel);
+  color: var(--tierra); cursor: pointer; font-weight: 600;
+  transition: all 0.15s;
+}
+.btn-protocolo-rapido:hover { background: var(--tierra); color: #fff; }
+.btn-protocolo-rapido.vencido { border-color: var(--rojo); background: var(--rojo-pastel); color: var(--rojo); }
+.btn-protocolo-rapido.vencido:hover { background: var(--rojo); color: #fff; }
+.btn-protocolo-rapido.proximo { border-color: var(--amarillo); background: var(--amarillo-pastel); color: #7a5c00; }
+
+.pendiente-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-radius: 8px; margin-bottom: 6px;
+  background: var(--crema); border: 1px solid var(--gris-borde); font-size: 0.82rem;
+}
+.pendiente-item.vencido { background: var(--rojo-pastel); border-color: var(--rojo); }
+.pendiente-item.hoy     { background: var(--amarillo-pastel); border-color: var(--amarillo); }
+
 /* ============ CALENDARIO ============ */
 .calendario-grid {
   display: grid; grid-template-columns: repeat(7, 1fr);
